@@ -12,7 +12,7 @@ Mod de utilidades server-side:
 - `/craft` command
 - AFK Detection
 
-### [Monitor Mod](./monitor-mod)
+### [MinecraftWebBrowserExplorerMod](./MinecraftWebBrowserExplorerMod)
 Mod que permite construir ecrãs multi-bloco com browser Chromium (MCEF).
 *Em desenvolvimento/planeamento.*
 
