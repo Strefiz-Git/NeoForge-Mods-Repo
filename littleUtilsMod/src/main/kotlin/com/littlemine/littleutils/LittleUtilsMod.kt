@@ -27,7 +27,9 @@ class LittleUtilsMod(container: ModContainer) {
     }
 
     init {
-        CONFIG = ServerConfig(ModConfigSpec.Builder())
+        val builder = ModConfigSpec.Builder()
+        CONFIG = ServerConfig(builder)
+        container.registerConfig(ModConfig.Type.SERVER, builder.build())
 
         val forgeBus = NeoForge.EVENT_BUS
         forgeBus.addListener(::onLivingDeath)
@@ -48,9 +50,9 @@ class LittleUtilsMod(container: ModContainer) {
     }
 
     private fun onRegisterCommands(event: RegisterCommandsEvent) {
-        if (!CONFIG.craftCommand.get()) return
         event.dispatcher.register(
             Commands.literal("craft")
+                .requires { src -> CONFIG.craftCommand.get() }
                 .executes { ctx ->
                     val player = ctx.source.playerOrException
                     player.openMenu(SimpleMenuProvider(
