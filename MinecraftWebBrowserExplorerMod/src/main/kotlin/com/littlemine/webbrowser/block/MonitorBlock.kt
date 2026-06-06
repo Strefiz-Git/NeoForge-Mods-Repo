@@ -16,10 +16,12 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty
 import net.minecraft.world.level.block.state.properties.DirectionProperty
 import net.minecraft.world.level.block.state.properties.EnumProperty
 import net.minecraft.world.phys.BlockHitResult
+import org.slf4j.Logger
 
 class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
 
     companion object {
+        private val LOGGER: Logger = com.mojang.logging.LogUtils.getLogger()
         val FACING: DirectionProperty = DirectionProperty.create("facing")
         val PART: EnumProperty<MonitorPart> = EnumProperty.create("part", MonitorPart::class.java)
         val ACTIVE: BooleanProperty = BooleanProperty.create("active")
@@ -58,7 +60,8 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
     }
 
     override fun getStateForPlacement(context: BlockPlaceContext): BlockState {
-        val facing = context.nearestLookingDirection.opposite
+        val facing = context.clickedFace
+        LOGGER.debug("[MonitorBlock] getStateForPlacement at {} facing={}", context.clickedPos, facing)
         return defaultBlockState().setValue(FACING, facing)
     }
 
@@ -67,6 +70,7 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
     }
 
     override fun onPlace(state: BlockState, level: Level, pos: BlockPos, oldState: BlockState, movedByPiston: Boolean) {
+        LOGGER.debug("[MonitorBlock] onPlace at {} facing={} active={}", pos, state.getValue(FACING), state.getValue(ACTIVE))
         if (state.block !== oldState.block) {
             val be = level.getBlockEntity(pos)
             if (be is MonitorBlockEntity) be.tryFormMonitor()
@@ -82,6 +86,7 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
     }
 
     override fun onRemove(state: BlockState, level: Level, pos: BlockPos, newState: BlockState, movedByPiston: Boolean) {
+        LOGGER.debug("[MonitorBlock] onRemove at {} active={}", pos, state.getValue(ACTIVE))
         if (state.block !== newState.block) {
             val be = level.getBlockEntity(pos)
             if (be is MonitorBlockEntity) be.invalidateMonitor()

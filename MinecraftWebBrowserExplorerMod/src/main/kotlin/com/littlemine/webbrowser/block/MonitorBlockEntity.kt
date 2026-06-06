@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.BlockHitResult
 
 class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEntityRegistry.MONITOR_BLOCK_ENTITY.get(), pos, state) {
+    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
 
     var width: Int = 1
     var height: Int = 1
@@ -78,7 +79,9 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
 
     fun tryFormMonitor() {
         val level = level ?: return
-        val detected = MonitorShapeDetector.findRectangle(blockPos, level) ?: return
+        val detected = MonitorShapeDetector.findRectangle(blockPos, level)
+        LOGGER.debug("[BE] tryFormMonitor at {} detected={}", blockPos, detected)
+        if (detected == null) return
         val facing = detected.facing
         val rightDir = detected.rightDir
         val downDir = detected.downDir
@@ -111,6 +114,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                 }
             }
         }
+        LOGGER.debug("[BE] tryFormMonitor SUCCESS: {}x{} active at {}", width, height, masterPos)
         setChanged()
     }
 

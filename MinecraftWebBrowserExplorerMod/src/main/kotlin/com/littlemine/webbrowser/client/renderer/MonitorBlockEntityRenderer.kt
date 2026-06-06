@@ -16,6 +16,7 @@ import org.joml.Vector3f
 import org.joml.Vector4f
 
 class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : BlockEntityRenderer<MonitorBlockEntity> {
+    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
 
     companion object {
         private val renderTypeCache = mutableMapOf<Int, RenderType>()
@@ -36,13 +37,24 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         packedLight: Int,
         packedOverlay: Int
     ) {
-        if (!entity.isActive) return
+        if (!entity.isActive) {
+            LOGGER.trace("[Renderer] skip inactive at {}", entity.blockPos)
+            return
+        }
         val master = entity.master()
-        val browser = ClientBrowserCache.get(master.blockPos) ?: return
+        val browser = ClientBrowserCache.get(master.blockPos)
+        if (browser == null) {
+            LOGGER.trace("[Renderer] no browser for master {}", master.blockPos)
+            return
+        }
 
         val state = entity.blockState
         val facing = state.getValue(MonitorBlock.FACING)
-        val shape = entity.shape ?: return
+        val shape = entity.shape
+        if (shape == null) {
+            LOGGER.trace("[Renderer] no shape for {}", entity.blockPos)
+            return
+        }
 
         val relX = entity.blockPos.x - shape.topLeft.x
         val relY = entity.blockPos.y - shape.topLeft.y
@@ -51,11 +63,11 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val col: Int
         val row: Int
         when (facing) {
-            Direction.NORTH -> { col = -relX; row = relY }
-            Direction.SOUTH -> { col = relX; row = relY }
-            Direction.EAST -> { col = relZ; row = relY }
-            Direction.WEST -> { col = -relZ; row = relY }
-            Direction.UP -> { col = relX; row = -relZ }
+            Direction.NORTH -> { col = relX; row = -relY }
+            Direction.SOUTH -> { col = -relX; row = -relY }
+            Direction.EAST -> { col = relZ; row = -relY }
+            Direction.WEST -> { col = -relZ; row = -relY }
+            Direction.UP -> { col = relX; row = relZ }
             Direction.DOWN -> { col = relX; row = relZ }
             else -> return
         }
@@ -66,6 +78,8 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val vMax = (row + 1).toFloat() / shape.height
 
         val textureId = browser.renderer.textureID
+        LOGGER.trace("[Renderer] {} col={} row={} uv=[{},{}]x[{},{}] texId={}",
+            entity.blockPos, col, row, uMin, uMax, vMin, vMax, textureId)
         val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))
 
         poseStack.pushPose()

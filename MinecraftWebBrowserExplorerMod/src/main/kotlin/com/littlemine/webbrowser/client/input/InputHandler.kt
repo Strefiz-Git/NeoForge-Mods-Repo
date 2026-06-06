@@ -15,6 +15,7 @@ import net.minecraft.world.phys.Vec3
 import net.neoforged.neoforge.network.PacketDistributor
 
 object InputHandler {
+    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
 
     var activeMonitor: MonitorBlockEntity? = null
         private set
@@ -23,18 +24,23 @@ object InputHandler {
 
     fun activate(be: MonitorBlockEntity) {
         val master = be.master()
-        val shape = master.shape ?: return
+        val shape = master.shape
+        LOGGER.debug("[InputHandler] activate at {} master={} shape={}", be.blockPos, master.blockPos, shape)
+        if (shape == null) return
         activeMonitor = be
         val browser = ClientBrowserCache.get(master.blockPos)
         if (browser == null) {
-            val b = MCEF.createBrowser(master.currentUrl, false,
-                shape.width * 120, shape.height * 120)
+            val sizeW = shape.width * 120
+            val sizeH = shape.height * 120
+            LOGGER.debug("[InputHandler] creating browser {}x{} url={}", sizeW, sizeH, master.currentUrl)
+            val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
             ClientBrowserCache.put(master.blockPos, b)
         }
         Minecraft.getInstance().mouseHandler.grabMouse()
     }
 
     fun deactivate() {
+        LOGGER.debug("[InputHandler] deactivate")
         activeMonitor?.let {
             ClientBrowserCache.remove(it.master().blockPos)
         }
@@ -43,10 +49,12 @@ object InputHandler {
     }
 
     fun openUrlScreen(be: MonitorBlockEntity) {
+        LOGGER.debug("[InputHandler] openUrlScreen for {}", be.blockPos)
         Minecraft.getInstance().setScreen(UrlScreen(be.master()))
     }
 
     fun updateUrl(be: MonitorBlockEntity, url: String) {
+        LOGGER.debug("[InputHandler] updateUrl {} -> {}", be.blockPos, url)
         be.currentUrl = url
         ClientBrowserCache.get(be.master().blockPos)?.loadURL(url)
         PacketDistributor.sendToServer(MonitorUpdatePacket(
@@ -128,28 +136,28 @@ object InputHandler {
         val browserY: Double
         when (facing) {
             Direction.NORTH -> {
-                browserX = (1f - dx) * blockPixelWidth + relX * blockPixelWidth
-                browserY = dy * blockPixelHeight + relY * blockPixelHeight
+                browserX = (relX + dx) * blockPixelWidth
+                browserY = (-relY + 1.0 - dy) * blockPixelHeight
             }
             Direction.SOUTH -> {
-                browserX = dx * blockPixelWidth + relX * blockPixelWidth
-                browserY = dy * blockPixelHeight + relY * blockPixelHeight
+                browserX = (-relX + 1.0 - dx) * blockPixelWidth
+                browserY = (-relY + 1.0 - dy) * blockPixelHeight
             }
             Direction.EAST -> {
-                browserX = dz * blockPixelWidth + relZ * blockPixelWidth
-                browserY = dy * blockPixelHeight + relY * blockPixelHeight
+                browserX = (relZ + dz) * blockPixelWidth
+                browserY = (-relY + 1.0 - dy) * blockPixelHeight
             }
             Direction.WEST -> {
-                browserX = (1f - dz) * blockPixelWidth + (-relZ) * blockPixelWidth
-                browserY = dy * blockPixelHeight + relY * blockPixelHeight
+                browserX = (-relZ + 1.0 - dz) * blockPixelWidth
+                browserY = (-relY + 1.0 - dy) * blockPixelHeight
             }
             Direction.UP -> {
-                browserX = dx * blockPixelWidth + relX * blockPixelWidth
-                browserY = (1f - dz) * blockPixelHeight + (-relZ) * blockPixelHeight
+                browserX = (relX + dx) * blockPixelWidth
+                browserY = (relZ + dz) * blockPixelHeight
             }
             Direction.DOWN -> {
-                browserX = dx * blockPixelWidth + relX * blockPixelWidth
-                browserY = dz * blockPixelHeight + relZ * blockPixelHeight
+                browserX = (relX + dx) * blockPixelWidth
+                browserY = (relZ + dz) * blockPixelHeight
             }
         }
 

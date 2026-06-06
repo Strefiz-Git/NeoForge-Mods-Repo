@@ -5,6 +5,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
+import org.slf4j.Logger
 
 data class MonitorShape(
     val topLeft: BlockPos,
@@ -16,6 +17,7 @@ data class MonitorShape(
 )
 
 object MonitorShapeDetector {
+    private val LOGGER: Logger = com.mojang.logging.LogUtils.getLogger()
 
     private const val MIN_SIZE = 2
     private const val MAX_WIDTH = 48
@@ -23,7 +25,10 @@ object MonitorShapeDetector {
 
     fun findRectangle(origin: BlockPos, level: Level): MonitorShape? {
         val originState = level.getBlockState(origin)
-        if (originState.block !is MonitorBlock) return null
+        if (originState.block !is MonitorBlock) {
+            LOGGER.debug("[ShapeDetector] findRectangle at {} — not a MonitorBlock", origin)
+            return null
+        }
 
         val facing = originState.getValue(MonitorBlock.FACING)
         val (rightDir, downDir) = getPerpendicularDirections(facing) ?: return null
@@ -33,13 +38,28 @@ object MonitorShapeDetector {
         val width = measureWidth(topLeft, level, rightDir, facing)
         val height = measureHeight(topLeft, level, downDir, facing)
 
-        if (width < MIN_SIZE || height < MIN_SIZE) return null
-        if (width > MAX_WIDTH || height > MAX_HEIGHT) return null
+        LOGGER.debug("[ShapeDetector] topLeft={} facing={} right={} down={} {}x{}", topLeft, facing, rightDir, downDir, width, height)
 
-        if (!isRectangleFilled(topLeft, width, height, level, rightDir, downDir, facing)) return null
+        if (width < MIN_SIZE || height < MIN_SIZE) {
+            LOGGER.debug("[ShapeDetector] too small (min {}x{})", MIN_SIZE, MIN_SIZE)
+            return null
+        }
+        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            LOGGER.debug("[ShapeDetector] too large (max {}x{})", MAX_WIDTH, MAX_HEIGHT)
+            return null
+        }
 
-        if (hasBlocksOutside(topLeft, width, height, level, rightDir, downDir, facing)) return null
+        if (!isRectangleFilled(topLeft, width, height, level, rightDir, downDir, facing)) {
+            LOGGER.debug("[ShapeDetector] rectangle not fully filled")
+            return null
+        }
 
+        if (hasBlocksOutside(topLeft, width, height, level, rightDir, downDir, facing)) {
+            LOGGER.debug("[ShapeDetector] blocks found outside rectangle")
+            return null
+        }
+
+        LOGGER.debug("[ShapeDetector] SUCCESS: {}x{} monitor from {}", width, height, topLeft)
         return MonitorShape(topLeft, width, height, facing, rightDir, downDir)
     }
 
@@ -140,9 +160,12 @@ object MonitorShapeDetector {
 
     private fun getPerpendicularDirections(facing: Direction): Pair<Direction, Direction>? {
         return when (facing) {
-            Direction.NORTH, Direction.SOUTH -> Pair(Direction.EAST, Direction.UP)
-            Direction.EAST, Direction.WEST -> Pair(Direction.NORTH, Direction.UP)
-            Direction.UP, Direction.DOWN -> Pair(Direction.NORTH, Direction.EAST)
+            Direction.NORTH -> Pair(Direction.EAST, Direction.DOWN)
+            Direction.SOUTH -> Pair(Direction.WEST, Direction.DOWN)
+            Direction.EAST -> Pair(Direction.SOUTH, Direction.DOWN)
+            Direction.WEST -> Pair(Direction.NORTH, Direction.DOWN)
+            Direction.UP -> Pair(Direction.EAST, Direction.SOUTH)
+            Direction.DOWN -> Pair(Direction.EAST, Direction.SOUTH)
         }
     }
 }
