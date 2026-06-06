@@ -22,11 +22,13 @@ object InputHandler {
     fun isInputActive(): Boolean = activeMonitor != null
 
     fun activate(be: MonitorBlockEntity) {
-        activeMonitor = be
         val master = be.master()
+        val shape = master.shape ?: return
+        activeMonitor = be
         val browser = ClientBrowserCache.get(master.blockPos)
         if (browser == null) {
-            val b = MCEF.createBrowser(master.currentUrl, false)
+            val b = MCEF.createBrowser(master.currentUrl, false,
+                shape.width * 120, shape.height * 120)
             ClientBrowserCache.put(master.blockPos, b)
         }
         Minecraft.getInstance().mouseHandler.grabMouse()

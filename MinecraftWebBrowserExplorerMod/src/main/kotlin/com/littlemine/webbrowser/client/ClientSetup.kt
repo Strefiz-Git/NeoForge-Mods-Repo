@@ -1,5 +1,6 @@
 package com.littlemine.webbrowser.client
 
+import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.block.MonitorBlock
 import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.input.InputHandler
@@ -9,6 +10,7 @@ import net.minecraft.client.Minecraft
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.fml.common.EventBusSubscriber
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.EntityRenderersEvent
 import net.neoforged.neoforge.client.event.InputEvent
@@ -19,6 +21,11 @@ object ClientGameEvents {
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent.Pre) {
         InputHandler.onClientTick()
+
+        val mc = Minecraft.getInstance()
+        if (InputHandler.isInputActive() && mc.screen != null) {
+            mc.setScreen(null)
+        }
     }
 
     @SubscribeEvent
@@ -70,6 +77,11 @@ object ClientGameEvents {
 
 @EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD, value = [Dist.CLIENT])
 object ClientSetup {
+
+    @SubscribeEvent
+    fun onClientSetup(event: FMLClientSetupEvent) {
+        MCEF.initialize()
+    }
 
     @SubscribeEvent
     fun onRegisterRenderers(event: EntityRenderersEvent.RegisterRenderers) {
