@@ -11,8 +11,9 @@ object BlockEntityRegistry {
     val BLOCK_ENTITIES: DeferredRegister<BlockEntityType<*>> =
         DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, MonitorMod.MOD_ID)
 
+    @Suppress("UNCHECKED_CAST")
     val MONITOR_BLOCK_ENTITY: DeferredHolder<BlockEntityType<*>, BlockEntityType<MonitorBlockEntity>> =
         BLOCK_ENTITIES.register("monitor_block_entity") { rl ->
-            BlockEntityType.Builder.of(::MonitorBlockEntity, BlockRegistry.MONITOR_BLOCK.get()).build(null)
+            BlockEntityType.Builder.of(::MonitorBlockEntity, BlockRegistry.MONITOR_BLOCK.get()).build(null) as BlockEntityType<MonitorBlockEntity>
         }
 }

@@ -5,6 +5,7 @@ import com.littlemine.webbrowser.block.MonitorBlock
 import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.input.InputHandler
 import com.littlemine.webbrowser.client.renderer.MonitorBlockEntityRenderer
+import com.littlemine.webbrowser.client.renderer.MonitorBlockEntityRenderer.Companion.clearRenderTypeCache
 import com.littlemine.webbrowser.registry.BlockEntityRegistry
 import net.minecraft.client.Minecraft
 import net.neoforged.api.distmarker.Dist
@@ -14,9 +15,17 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.EntityRenderersEvent
 import net.neoforged.neoforge.client.event.InputEvent
+import net.neoforged.neoforge.event.level.LevelEvent
 
 @EventBusSubscriber(bus = EventBusSubscriber.Bus.GAME, value = [Dist.CLIENT])
 object ClientGameEvents {
+
+    @SubscribeEvent
+    fun onLevelUnload(event: LevelEvent.Unload) {
+        ClientBrowserCache.clear()
+        clearRenderTypeCache()
+        InputHandler.deactivate()
+    }
 
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent.Pre) {
@@ -80,7 +89,11 @@ object ClientSetup {
 
     @SubscribeEvent
     fun onClientSetup(event: FMLClientSetupEvent) {
-        MCEF.initialize()
+        if (!MCEF.initialize()) {
+            com.mojang.logging.LogUtils.getLogger().error(
+                "[WebBrowser] MCEF.initialize() failed — browser features will not work"
+            )
+        }
     }
 
     @SubscribeEvent

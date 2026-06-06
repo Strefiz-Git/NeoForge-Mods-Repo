@@ -6,6 +6,7 @@ import com.littlemine.webbrowser.client.ClientBrowserCache
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 import net.minecraft.client.renderer.texture.OverlayTexture
@@ -15,6 +16,17 @@ import org.joml.Vector3f
 import org.joml.Vector4f
 
 class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : BlockEntityRenderer<MonitorBlockEntity> {
+
+    companion object {
+        private val renderTypeCache = mutableMapOf<Int, RenderType>()
+
+        fun clearRenderTypeCache() {
+            renderTypeCache.clear()
+        }
+
+        private fun getOrCreateRenderType(textureId: Int): RenderType =
+            renderTypeCache.getOrPut(textureId) { createMCEFRenderType { textureId } }
+    }
 
     override fun render(
         entity: MonitorBlockEntity,
@@ -54,8 +66,7 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val vMax = (row + 1).toFloat() / shape.height
 
         val textureId = browser.renderer.textureID
-        val renderType = createMCEFRenderType { textureId }
-        val buffer = bufferSource.getBuffer(renderType)
+        val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))
 
         poseStack.pushPose()
         renderScreenFace(poseStack, buffer, facing, uMin, uMax, vMin, vMax)

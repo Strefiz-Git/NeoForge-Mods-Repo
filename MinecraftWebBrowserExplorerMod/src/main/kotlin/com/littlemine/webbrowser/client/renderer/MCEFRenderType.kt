@@ -11,6 +11,7 @@ class MCEFBrowserTextureShard(textureId: () -> Int) : RenderStateShard.EmptyText
     { }
 )
 
+@Suppress("INVISIBLE_REFERENCE")
 fun createMCEFRenderType(textureId: () -> Int): RenderType {
     val state = RenderType.CompositeState.builder()
         .setTextureState(MCEFBrowserTextureShard(textureId))
@@ -26,5 +27,5 @@ fun createMCEFRenderType(textureId: () -> Int): RenderType {
         false,
         false,
         state
-    )
+    ) as RenderType
 }

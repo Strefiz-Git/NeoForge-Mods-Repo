@@ -117,8 +117,9 @@ object InputHandler {
         val relY = pos.y - shape.topLeft.y
         val relZ = pos.z - shape.topLeft.z
 
-        val hitU = (hit.location.x - pos.x - 0.5) + 0.5
-        val hitV = (hit.location.y - pos.y - 0.5) + 0.5
+        val dx = hit.location.x - pos.x
+        val dy = hit.location.y - pos.y
+        val dz = hit.location.z - pos.z
 
         val blockPixelWidth = 120
         val blockPixelHeight = 120
@@ -127,30 +128,29 @@ object InputHandler {
         val browserY: Double
         when (facing) {
             Direction.NORTH -> {
-                browserX = (1f - hitU) * blockPixelWidth + relX * blockPixelWidth
-                browserY = hitV * blockPixelHeight + relY * blockPixelHeight
+                browserX = (1f - dx) * blockPixelWidth + relX * blockPixelWidth
+                browserY = dy * blockPixelHeight + relY * blockPixelHeight
             }
             Direction.SOUTH -> {
-                browserX = hitU * blockPixelWidth + relX * blockPixelWidth
-                browserY = hitV * blockPixelHeight + relY * blockPixelHeight
+                browserX = dx * blockPixelWidth + relX * blockPixelWidth
+                browserY = dy * blockPixelHeight + relY * blockPixelHeight
             }
             Direction.EAST -> {
-                browserX = hitU * blockPixelWidth + relZ * blockPixelWidth
-                browserY = hitV * blockPixelHeight + relY * blockPixelHeight
+                browserX = dz * blockPixelWidth + relZ * blockPixelWidth
+                browserY = dy * blockPixelHeight + relY * blockPixelHeight
             }
             Direction.WEST -> {
-                browserX = (1f - hitU) * blockPixelWidth + (-relZ) * blockPixelWidth
-                browserY = hitV * blockPixelHeight + relY * blockPixelHeight
+                browserX = (1f - dz) * blockPixelWidth + (-relZ) * blockPixelWidth
+                browserY = dy * blockPixelHeight + relY * blockPixelHeight
             }
             Direction.UP -> {
-                browserX = hitU * blockPixelWidth + relX * blockPixelWidth
-                browserY = (1f - hitV) * blockPixelHeight + (-relZ) * blockPixelHeight
+                browserX = dx * blockPixelWidth + relX * blockPixelWidth
+                browserY = (1f - dz) * blockPixelHeight + (-relZ) * blockPixelHeight
             }
             Direction.DOWN -> {
-                browserX = hitU * blockPixelWidth + relX * blockPixelWidth
-                browserY = hitV * blockPixelHeight + relZ * blockPixelHeight
+                browserX = dx * blockPixelWidth + relX * blockPixelWidth
+                browserY = dz * blockPixelHeight + relZ * blockPixelHeight
             }
-            else -> return Pair(0.0, 0.0)
         }
 
         return Pair(

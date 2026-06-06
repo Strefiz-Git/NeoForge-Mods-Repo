@@ -6,14 +6,13 @@ import net.neoforged.fml.common.EventBusSubscriber
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import net.neoforged.neoforge.network.handling.IPayloadContext
 import net.neoforged.neoforge.network.handling.IPayloadHandler
-import net.neoforged.neoforge.network.registration.PayloadRegistrar
 
 @EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
 object Network {
 
     @SubscribeEvent
     fun onRegisterPayloadHandlers(event: RegisterPayloadHandlersEvent) {
-        val registrar = PayloadRegistrar(MonitorMod.MOD_ID)
+        val registrar = event.registrar(MonitorMod.MOD_ID)
 
         registrar.playToServer(
             MonitorUpdatePacket.TYPE,
