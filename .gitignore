@@ -11,4 +11,6 @@
 **/*.iws
 **/local.properties
 **/.kotlin/
+**/bin/
+**/neoforge-*-installer.jar.log
 /server-teste

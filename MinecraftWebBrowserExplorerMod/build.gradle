@@ -69,14 +69,14 @@ repositories {
     }
     maven {
         name = 'MCEF'
-        url = 'https://keksuccino.github.io/maven/'
-        content { includeGroup "de.keksuccino" }
+        url = 'https://mcef-download.cinemamod.com/repositories/releases'
+        content { includeGroup "com.cinemamod" }
     }
 }
 
 dependencies {
     implementation 'thedarkcolour:kotlinforforge-neoforge:5.11.0'
-    implementation "de.keksuccino:mcef-neoforge:${mcef_version}-${minecraft_version}"
+    implementation "com.cinemamod:mcef:${mcef_version}-${minecraft_version}"
 }
 
 tasks.withType(ProcessResources).configureEach {
@@ -92,6 +92,7 @@ tasks.withType(ProcessResources).configureEach {
             mod_version            : mod_version,
             mod_authors            : mod_authors,
             mod_description        : mod_description,
+            mcef_version           : mcef_version,
     ]
     inputs.properties replaceProperties
 

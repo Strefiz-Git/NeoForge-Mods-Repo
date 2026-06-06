@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "webbrowser:block/monitor_border",
+    "north": "webbrowser:block/monitor_off",
+    "south": "webbrowser:block/monitor_border",
+    "east": "webbrowser:block/monitor_border",
+    "west": "webbrowser:block/monitor_border",
+    "up": "webbrowser:block/monitor_border",
+    "down": "webbrowser:block/monitor_border"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "multipart": [
+    {
+      "when": { "facing": "north", "active": "false" },
+      "apply": { "model": "webbrowser:block/monitor_block_off" }
+    },
+    {
+      "when": { "facing": "south", "active": "false" },
+      "apply": { "model": "webbrowser:block/monitor_block_off", "y": 180 }
+    },
+    {
+      "when": { "facing": "east", "active": "false" },
+      "apply": { "model": "webbrowser:block/monitor_block_off", "y": 90 }
+    },
+    {
+      "when": { "facing": "west", "active": "false" },
+      "apply": { "model": "webbrowser:block/monitor_block_off", "y": 270 }
+    },
+    {
+      "when": { "facing": "up", "active": "false" },
+      "apply": { "model": "webbrowser:block/monitor_block_off", "x": 270 }
+    },
+    {
+      "when": { "facing": "down", "active": "false" },
+      "apply": { "model": "webbrowser:block/monitor_block_off", "x": 90 }
+    },
+    {
+      "when": { "facing": "north", "active": "true" },
+      "apply": { "model": "webbrowser:block/monitor_block_on" }
+    },
+    {
+      "when": { "facing": "south", "active": "true" },
+      "apply": { "model": "webbrowser:block/monitor_block_on", "y": 180 }
+    },
+    {
+      "when": { "facing": "east", "active": "true" },
+      "apply": { "model": "webbrowser:block/monitor_block_on", "y": 90 }
+    },
+    {
+      "when": { "facing": "west", "active": "true" },
+      "apply": { "model": "webbrowser:block/monitor_block_on", "y": 270 }
+    },
+    {
+      "when": { "facing": "up", "active": "true" },
+      "apply": { "model": "webbrowser:block/monitor_block_on", "x": 270 }
+    },
+    {
+      "when": { "facing": "down", "active": "true" },
+      "apply": { "model": "webbrowser:block/monitor_block_on", "x": 90 }
+    }
+  ]
+}

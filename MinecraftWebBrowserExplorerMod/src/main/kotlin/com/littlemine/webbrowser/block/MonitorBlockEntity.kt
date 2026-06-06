@@ -1,0 +1,144 @@
+package com.littlemine.webbrowser.block
+
+import com.littlemine.webbrowser.logic.MonitorShape
+import com.littlemine.webbrowser.logic.MonitorShapeDetector
+import com.littlemine.webbrowser.registry.BlockEntityRegistry
+import net.minecraft.core.BlockPos
+import net.minecraft.core.HolderLookup
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.network.protocol.Packet
+import net.minecraft.network.protocol.game.ClientGamePacketListener
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.Level
+import net.minecraft.world.level.block.entity.BlockEntity
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.phys.BlockHitResult
+
+class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEntityRegistry.MONITOR_BLOCK_ENTITY.get(), pos, state) {
+
+    var width: Int = 1
+    var height: Int = 1
+    var currentUrl: String = "https://www.google.com"
+    var isActive: Boolean = false
+    var masterPos: BlockPos = blockPos
+    var shape: MonitorShape? = null
+
+    val isMaster: Boolean get() = masterPos == blockPos
+
+    fun handleClick(player: Player, hit: BlockHitResult): net.minecraft.world.InteractionResult {
+        if (level == null || !isActive) return net.minecraft.world.InteractionResult.PASS
+        return net.minecraft.world.InteractionResult.SUCCESS
+    }
+
+    fun master(): MonitorBlockEntity {
+        if (isMaster) return this
+        val be = level?.getBlockEntity(masterPos)
+        return if (be is MonitorBlockEntity) be else this
+    }
+
+    fun invalidateMonitor() {
+        if (!isActive) return
+        val s = shape ?: return
+        isActive = false
+        for (row in 0 until s.height) {
+            for (col in 0 until s.width) {
+                val p = s.topLeft.offset(
+                    s.rightDir.stepX * col + s.downDir.stepX * row,
+                    s.rightDir.stepY * col + s.downDir.stepY * row,
+                    s.rightDir.stepZ * col + s.downDir.stepZ * row
+                )
+                val state = level?.getBlockState(p) ?: continue
+                if (state.block is MonitorBlock) {
+                    level?.setBlock(p, state.setValue(MonitorBlock.ACTIVE, false).setValue(MonitorBlock.PART, MonitorPart.SINGLE), 3)
+                    val be = level?.getBlockEntity(p)
+                    if (be is MonitorBlockEntity && be !== this) {
+                        be.isActive = false
+                        be.width = 1
+                        be.height = 1
+                        be.masterPos = p
+                        be.shape = null
+                    }
+                }
+            }
+        }
+        width = 1
+        height = 1
+        masterPos = blockPos
+        shape = null
+        setChanged()
+    }
+
+    fun validateNeighbors() {
+        val detected = level?.let { MonitorShapeDetector.findRectangle(blockPos, it) }
+        if (detected == null || detected.width != width || detected.height != height) {
+            invalidateMonitor()
+        }
+    }
+
+    fun tryFormMonitor() {
+        val level = level ?: return
+        val detected = MonitorShapeDetector.findRectangle(blockPos, level) ?: return
+        val facing = detected.facing
+        val rightDir = detected.rightDir
+        val downDir = detected.downDir
+
+        shape = detected
+        width = detected.width
+        height = detected.height
+        isActive = true
+        masterPos = detected.topLeft
+
+        for (row in 0 until detected.height) {
+            for (col in 0 until detected.width) {
+                val p = detected.topLeft.offset(
+                    rightDir.stepX * col + downDir.stepX * row,
+                    rightDir.stepY * col + downDir.stepY * row,
+                    rightDir.stepZ * col + downDir.stepZ * row
+                )
+                val state = level.getBlockState(p)
+                if (state.block !is MonitorBlock) continue
+                val part = MonitorBlock.calculatePart(col, row, detected.width, detected.height)
+                level.setBlock(p, state.setValue(MonitorBlock.PART, part).setValue(MonitorBlock.ACTIVE, true), 3)
+                val be = level.getBlockEntity(p)
+                if (be is MonitorBlockEntity && be !== this) {
+                    be.width = detected.width
+                    be.height = detected.height
+                    be.isActive = true
+                    be.masterPos = detected.topLeft
+                    be.shape = detected
+                    be.setChanged()
+                }
+            }
+        }
+        setChanged()
+    }
+
+    override fun saveAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {
+        super.saveAdditional(tag, registries)
+        tag.putInt("width", width)
+        tag.putInt("height", height)
+        tag.putString("url", currentUrl)
+        tag.putBoolean("active", isActive)
+        tag.putLong("master_pos", masterPos.asLong())
+    }
+
+    override fun loadAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {
+        super.loadAdditional(tag, registries)
+        width = tag.getInt("width")
+        height = tag.getInt("height")
+        currentUrl = tag.getString("url")
+        isActive = tag.getBoolean("active")
+        if (tag.contains("master_pos")) masterPos = BlockPos.of(tag.getLong("master_pos"))
+    }
+
+    override fun getUpdateTag(registries: HolderLookup.Provider): CompoundTag {
+        val tag = CompoundTag()
+        saveAdditional(tag, registries)
+        return tag
+    }
+
+    override fun getUpdatePacket(): Packet<ClientGamePacketListener>? {
+        return ClientboundBlockEntityDataPacket.create(this)
+    }
+}
