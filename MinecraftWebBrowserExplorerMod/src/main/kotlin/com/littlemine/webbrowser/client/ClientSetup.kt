@@ -15,10 +15,22 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.EntityRenderersEvent
 import net.neoforged.neoforge.client.event.InputEvent
+import net.neoforged.neoforge.event.level.ChunkEvent
 import net.neoforged.neoforge.event.level.LevelEvent
 
 @EventBusSubscriber(bus = EventBusSubscriber.Bus.GAME, value = [Dist.CLIENT])
 object ClientGameEvents {
+
+    @SubscribeEvent
+    fun onChunkUnload(event: ChunkEvent.Unload) {
+        val chunk = event.chunk
+        if (chunk !is net.minecraft.world.level.chunk.LevelChunk) return
+        for (be in chunk.blockEntities.values) {
+            if (be is MonitorBlockEntity && be.isMaster) {
+                ClientBrowserCache.remove(be.blockPos)
+            }
+        }
+    }
 
     @SubscribeEvent
     fun onLevelUnload(event: LevelEvent.Unload) {
