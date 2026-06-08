@@ -1,5 +1,6 @@
 package com.littlemine.webbrowser.client.input
 
+import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.ClientBrowserCache
 import com.littlemine.webbrowser.network.MonitorUpdatePacket
@@ -16,6 +17,7 @@ class UrlScreen(private val monitor: MonitorBlockEntity) : Screen(Component.tran
         urlField = EditBox(font, width / 2 - 100, height / 2 - 10, 200, 20, Component.literal("URL"))
         urlField.value = monitor.currentUrl
         urlField.isFocused = true
+        urlField.setMaxLength(2048)
         addRenderableWidget(urlField)
         addRenderableWidget(
             net.minecraft.client.gui.components.Button.Builder(
@@ -32,7 +34,18 @@ class UrlScreen(private val monitor: MonitorBlockEntity) : Screen(Component.tran
         } else {
             monitor.currentUrl = url
         }
-        ClientBrowserCache.get(monitor.blockPos)?.loadURL(monitor.currentUrl)
+        var browser = ClientBrowserCache.get(monitor.blockPos)
+        if (browser == null) {
+            val shape = monitor.shape
+            if (shape != null) {
+                val b = MCEF.createBrowser(monitor.currentUrl, false, shape.width * 120, shape.height * 120)
+                if (b != null) {
+                    ClientBrowserCache.put(monitor.blockPos, b)
+                    browser = b
+                }
+            }
+        }
+        browser?.loadURL(monitor.currentUrl)
         PacketDistributor.sendToServer(MonitorUpdatePacket(
             monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z, monitor.currentUrl
         ))

@@ -1,5 +1,6 @@
 package com.littlemine.webbrowser.block
 
+import com.littlemine.webbrowser.ClientBridge
 import com.littlemine.webbrowser.logic.MonitorShape
 import com.littlemine.webbrowser.logic.MonitorShapeDetector
 import com.littlemine.webbrowser.registry.BlockEntityRegistry
@@ -9,11 +10,8 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.game.ClientGamePacketListener
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket
-import net.minecraft.world.entity.player.Player
-import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.phys.BlockHitResult
 
 class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEntityRegistry.MONITOR_BLOCK_ENTITY.get(), pos, state) {
     private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
@@ -26,11 +24,6 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     var shape: MonitorShape? = null
 
     val isMaster: Boolean get() = masterPos == blockPos
-
-    fun handleClick(player: Player, hit: BlockHitResult): net.minecraft.world.InteractionResult {
-        if (level == null || !isActive) return net.minecraft.world.InteractionResult.PASS
-        return net.minecraft.world.InteractionResult.SUCCESS
-    }
 
     fun master(): MonitorBlockEntity {
         if (isMaster) return this
@@ -116,6 +109,10 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         }
         LOGGER.debug("[BE] tryFormMonitor SUCCESS: {}x{} active at {}", width, height, masterPos)
         setChanged()
+
+        if (level.isClientSide) {
+            ClientBridge.onMonitorFormed?.invoke(this)
+        }
     }
 
     override fun saveAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {

@@ -8,9 +8,7 @@ object ClientBrowserCache {
     private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
 
     fun get(pos: BlockPos): MCEFBrowser? {
-        val b = browsers[pos]
-        LOGGER.debug("[BrowserCache] get({}) = {}", pos, if (b != null) "found" else "null")
-        return b
+        return browsers[pos]
     }
 
     fun put(pos: BlockPos, browser: MCEFBrowser) {
