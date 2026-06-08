@@ -1,8 +1,8 @@
 package com.littlemine.webbrowser.network
 
 import com.littlemine.webbrowser.MonitorMod
-import com.littlemine.webbrowser.block.MonitorBlock
 import com.littlemine.webbrowser.block.MonitorBlockEntity
+import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.item.MonitorCommandItem
 import net.minecraft.core.BlockPos
 import net.neoforged.bus.api.SubscribeEvent
@@ -25,16 +25,30 @@ object Network {
         )
 
         registrar.playToServer(
-            MonitorInputPacket.TYPE,
-            MonitorInputPacket.STREAM_CODEC,
-            MonitorInputHandler
-        )
-
-        registrar.playToServer(
             CommandSyncPacket.TYPE,
             CommandSyncPacket.STREAM_CODEC,
             CommandSyncHandler
         )
+
+        registrar.playToServer(
+            MonitorResolutionPacket.TYPE,
+            MonitorResolutionPacket.STREAM_CODEC,
+            MonitorResolutionHandler
+        )
+    }
+}
+
+object MonitorResolutionHandler : IPayloadHandler<MonitorResolutionPacket> {
+    override fun handle(packet: MonitorResolutionPacket, ctx: IPayloadContext) {
+        val pos = BlockPos(packet.posX, packet.posY, packet.posZ)
+        val level = ctx.player().level()
+        val be = level.getBlockEntity(pos)
+        if (be is MonitorBlockEntity) {
+            val ppb = packet.pixelsPerBlock.coerceIn(BrowserConstants.MIN_BLOCK_PIXELS, BrowserConstants.MAX_BLOCK_PIXELS)
+            be.pixelsPerBlock = ppb
+            be.setChanged()
+            level.sendBlockUpdated(pos, be.blockState, be.blockState, 3)
+        }
     }
 }
 
@@ -75,8 +89,4 @@ object MonitorUpdateHandler : IPayloadHandler<MonitorUpdatePacket> {
     }
 }
 
-object MonitorInputHandler : IPayloadHandler<MonitorInputPacket> {
-    override fun handle(packet: MonitorInputPacket, ctx: IPayloadContext) {
-        // Server acknowledges mouse input; no processing needed
-    }
-}
+

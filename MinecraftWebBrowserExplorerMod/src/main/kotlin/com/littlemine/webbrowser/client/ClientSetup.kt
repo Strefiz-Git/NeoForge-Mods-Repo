@@ -3,9 +3,11 @@ package com.littlemine.webbrowser.client
 import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.ClientBridge
 import com.littlemine.webbrowser.block.MonitorBlockEntity
+import com.littlemine.webbrowser.client.gui.BrowserScreen
 import com.littlemine.webbrowser.client.input.InputHandler
 import com.littlemine.webbrowser.client.renderer.MonitorBlockEntityRenderer
 import com.littlemine.webbrowser.client.renderer.MonitorBlockEntityRenderer.Companion.clearRenderTypeCache
+import com.littlemine.webbrowser.item.MonitorCommandItem
 import com.littlemine.webbrowser.registry.BlockEntityRegistry
 import net.minecraft.client.Minecraft
 import net.neoforged.api.distmarker.Dist
@@ -27,40 +29,42 @@ object ClientGameEvents {
             val master = be.master()
             val shape = master.shape
             if (shape != null) {
-                val targetW = shape.width * BrowserConstants.BLOCK_PIXEL_WIDTH
-                val targetH = shape.height * BrowserConstants.BLOCK_PIXEL_HEIGHT
-                LOGGER.debug("[ClientGameEvents] onMonitorFormed at {} shape={}x{} -> browser target {}x{}",
-                    master.blockPos, shape.width, shape.height, targetW, targetH)
+                val ppb = master.pixelsPerBlock
+                val targetW = shape.width * ppb
+                val targetH = shape.height * ppb
+                LOGGER.info("[Monitor] monitor formed at {} ppb={} shape={}x{} -> browser {}x{}",
+                    master.blockPos, ppb, shape.width, shape.height, targetW, targetH)
 
                 val existing = ClientBrowserCache.get(master.blockPos)
                 if (existing != null) {
-                    LOGGER.debug("[ClientGameEvents] browser already exists at {}, closing and recreating", master.blockPos)
+                    LOGGER.info("[Monitor] browser already exists at {}, closing and recreating", master.blockPos)
                     ClientBrowserCache.remove(master.blockPos)
                 }
 
-                LOGGER.debug("[ClientGameEvents] creating browser {}x{} url={}", targetW, targetH, master.currentUrl)
+                LOGGER.info("[Monitor] creating browser {}x{} url={}", targetW, targetH, master.currentUrl)
                 val b = MCEF.createBrowser(master.currentUrl, false, targetW, targetH)
                 if (b != null) {
                     ClientBrowserCache.put(master.blockPos, b)
-                    LOGGER.debug("[ClientGameEvents] browser created, textureID={}", b.renderer.textureID)
+                    LOGGER.info("[Monitor] browser created, textureID={}", b.renderer.textureID)
                 } else {
-                    LOGGER.error("[ClientGameEvents] MCEF.createBrowser returned null!")
+                    LOGGER.error("[Monitor] MCEF.createBrowser returned null!")
                 }
             } else {
-                LOGGER.warn("[ClientGameEvents] onMonitorFormed - no shape for master {}", master.blockPos)
+                LOGGER.warn("[Monitor] onMonitorFormed - no shape for master {}", master.blockPos)
             }
         }
 
         ClientBridge.onMonitorBreak = { be ->
             val master = be.master()
-            LOGGER.debug("[ClientGameEvents] onMonitorBreak at {} master={}", be.blockPos, master.blockPos)
+            LOGGER.info("[Monitor] onMonitorBreak at {} master={}", be.blockPos, master.blockPos)
             ClientBrowserCache.remove(master.blockPos)
             clearRenderTypeCache()
         }
 
-        ClientBridge.onMonitorCommandShiftUse = { be ->
-            LOGGER.debug("[ClientGameEvents] onMonitorCommandShiftUse at {}", be.blockPos)
-            InputHandler.openUrlScreen(be)
+        ClientBridge.onMonitorCommandRightClick = { be ->
+            val master = be.master()
+            LOGGER.info("[Monitor] onMonitorCommandRightClick at {} master={}", be.blockPos, master.blockPos)
+            Minecraft.getInstance().setScreen(BrowserScreen(master))
         }
     }
 
@@ -72,7 +76,7 @@ object ClientGameEvents {
             if (be is MonitorBlockEntity && be.isMaster && be.isActive) {
                 val existing = ClientBrowserCache.get(be.blockPos)
                 if (existing == null) {
-                    LOGGER.debug("[ClientGameEvents] chunk loaded with active monitor at {} - browser will be created on interaction", be.blockPos)
+                    LOGGER.info("[Monitor] chunk loaded with active monitor at {} - browser will be created on interaction", be.blockPos)
                 }
             }
         }
@@ -80,86 +84,88 @@ object ClientGameEvents {
 
     @SubscribeEvent
     fun onChunkUnload(event: ChunkEvent.Unload) {
-        // Don't destroy browsers on chunk unload - they survive until level unload
     }
 
     @SubscribeEvent
     fun onLevelUnload(event: LevelEvent.Unload) {
-        LOGGER.debug("[ClientGameEvents] level unload - clearing all")
+        LOGGER.info("[Monitor] level unload - clearing all")
         ClientBrowserCache.clear()
         clearRenderTypeCache()
-        InputHandler.deactivate()
+        InputHandler.setActiveMonitor(null)
     }
 
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent.Pre) {
-        InputHandler.onClientTick()
-
-        val mc = Minecraft.getInstance()
-        if (InputHandler.isInputActive()) {
-            // Keep mouse grabbed while input is active
-            if (!mc.mouseHandler.isMouseGrabbed) {
-                mc.mouseHandler.grabMouse()
-            }
-            if (mc.screen != null) {
-                LOGGER.trace("[ClientGameEvents] closing unexpected screen while input active")
-                mc.setScreen(null)
-            }
-        }
-    }
-
-    @SubscribeEvent
-    fun onMouseClick(event: InputEvent.MouseButton.Pre) {
-        if (InputHandler.isInputActive()) {
-            LOGGER.trace("[ClientGameEvents] mouse click {} action={}", event.button, event.action)
-            InputHandler.onMouseClick(event.button, event.action, event.modifiers)
-            event.setCanceled(true)
-        }
-    }
-
-    @SubscribeEvent
-    fun onKeyPress(event: InputEvent.Key) {
-        if (!InputHandler.isInputActive()) return
-
-        // ESC = deactivate, then let the event through so the game opens pause menu
-        if (event.key == 256) {
-            LOGGER.debug("[ClientGameEvents] ESC pressed - deactivating input")
-            InputHandler.deactivate()
-            return
-        }
-
-        // Forward key to CEF
-        when (event.action) {
-            1, 2 -> InputHandler.onKeyPress(event.key, event.scanCode, event.modifiers)
-            0 -> InputHandler.onKeyRelease(event.key, event.scanCode, event.modifiers)
-        }
-
-        // Reset key mapping to prevent game from processing this key
-        val key = com.mojang.blaze3d.platform.InputConstants.getKey(event.key, event.scanCode)
-        net.minecraft.client.KeyMapping.set(key, false)
-    }
-
-    @SubscribeEvent
-    fun onScroll(event: InputEvent.MouseScrollingEvent) {
-        if (InputHandler.isInputActive()) {
-            InputHandler.onScroll(event.scrollDeltaX, event.scrollDeltaY)
-            event.setCanceled(true)
-        }
-    }
-
-    @SubscribeEvent
-    fun onLeftClickBlock(event: PlayerInteractEvent.LeftClickBlock) {
-        if (InputHandler.isInputActive()) {
-            event.setCanceled(true)
-        }
     }
 
     @SubscribeEvent
     fun onRightClickBlock(event: PlayerInteractEvent.RightClickBlock) {
-        if (InputHandler.isInputActive()) {
+        val player = event.entity
+        val item = player.mainHandItem
+        val be = event.level.getBlockEntity(event.pos)
+
+        if (item.item is MonitorCommandItem && MonitorCommandItem.isConnected(item)) {
+            LOGGER.info("[Monitor] RightClickBlock with connected command at {}", event.pos)
             event.setCanceled(true)
+            val connectedPos = MonitorCommandItem.getConnectedPos(item) ?: return
+            val masterBe = event.level.getBlockEntity(connectedPos)
+            if (masterBe is MonitorBlockEntity && masterBe.isActive) {
+                val master = masterBe.master()
+                if (InputHandler.isOccupied(master.blockPos)) {
+                    player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("message.webbrowser.occupied"),
+                        true
+                    )
+                    return
+                }
+                InputHandler.setActiveMonitor(master.blockPos)
+                Minecraft.getInstance().setScreen(BrowserScreen(master))
+            } else {
+                LOGGER.info("[Monitor] RightClickBlock - connected pos {} not active or not monitor", connectedPos)
+            }
+            return
+        }
+
+        if (be is MonitorBlockEntity && be.isActive) {
+            LOGGER.info("[Monitor] RightClickBlock on active monitor without command at {}", event.pos)
+            event.setCanceled(true)
+            player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable("message.webbrowser.need_command"),
+                true
+            )
         }
     }
+
+    @SubscribeEvent
+    fun onRightClickItem(event: PlayerInteractEvent.RightClickItem) {
+        val player = event.entity
+        val item = player.mainHandItem
+        if (item.item !is MonitorCommandItem) return
+        if (!MonitorCommandItem.isConnected(item)) return
+
+        LOGGER.info("[Monitor] RightClickItem with connected command")
+        event.setCanceled(true)
+
+        val connectedPos = MonitorCommandItem.getConnectedPos(item) ?: return
+        val be = event.level.getBlockEntity(connectedPos)
+        if (be !is MonitorBlockEntity || !be.isActive) {
+            LOGGER.info("[Monitor] RightClickItem - connected {} not active", connectedPos)
+            return
+        }
+
+        val master = be.master()
+        if (InputHandler.isOccupied(master.blockPos)) {
+            player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable("message.webbrowser.occupied"),
+                true
+            )
+            return
+        }
+
+        InputHandler.setActiveMonitor(master.blockPos)
+        Minecraft.getInstance().setScreen(BrowserScreen(master))
+    }
+
 }
 
 @EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD, value = [Dist.CLIENT])

@@ -27,7 +27,7 @@ object MonitorShapeDetector {
     fun findRectangle(origin: BlockPos, level: Level): MonitorShape? {
         val originState = level.getBlockState(origin)
         if (originState.block !is MonitorBlock) {
-            LOGGER.debug("[ShapeDetector] findRectangle at {} — not a MonitorBlock", origin)
+            LOGGER.info("[ShapeDetector] findRectangle at {} — not a MonitorBlock", origin)
             return null
         }
 
@@ -39,33 +39,33 @@ object MonitorShapeDetector {
         val width = measureWidth(topLeft, level, rightDir, facing)
         val height = measureHeight(topLeft, level, downDir, facing)
 
-        LOGGER.debug("[ShapeDetector] topLeft={} facing={} right={} down={} {}x{}", topLeft, facing, rightDir, downDir, width, height)
+        LOGGER.info("[ShapeDetector] topLeft={} facing={} right={} down={} {}x{}", topLeft, facing, rightDir, downDir, width, height)
 
         if (width < MIN_WIDTH || height < MIN_HEIGHT) {
-            LOGGER.debug("[ShapeDetector] too small (min {}x{})", MIN_WIDTH, MIN_HEIGHT)
+            LOGGER.info("[ShapeDetector] too small (min {}x{})", MIN_WIDTH, MIN_HEIGHT)
             return null
         }
         if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-            LOGGER.debug("[ShapeDetector] too large (max {}x{})", MAX_WIDTH, MAX_HEIGHT)
+            LOGGER.info("[ShapeDetector] too large (max {}x{})", MAX_WIDTH, MAX_HEIGHT)
             return null
         }
         // Max aspect ratio 16:9
         if (width.toLong() * 9 > height.toLong() * 16) {
-            LOGGER.debug("[ShapeDetector] aspect ratio too wide ({}x{} exceeds 16:9)", width, height)
+            LOGGER.info("[ShapeDetector] aspect ratio too wide ({}x{} exceeds 16:9)", width, height)
             return null
         }
 
         if (!isRectangleFilled(topLeft, width, height, level, rightDir, downDir, facing)) {
-            LOGGER.debug("[ShapeDetector] rectangle not fully filled")
+            LOGGER.info("[ShapeDetector] rectangle not fully filled")
             return null
         }
 
         if (hasBlocksOutside(topLeft, width, height, level, rightDir, downDir, facing)) {
-            LOGGER.debug("[ShapeDetector] blocks found outside rectangle")
+            LOGGER.info("[ShapeDetector] blocks found outside rectangle")
             return null
         }
 
-        LOGGER.debug("[ShapeDetector] SUCCESS: {}x{} monitor from {}", width, height, topLeft)
+        LOGGER.info("[ShapeDetector] SUCCESS: {}x{} monitor from {}", width, height, topLeft)
         return MonitorShape(topLeft, width, height, facing, rightDir, downDir)
     }
 

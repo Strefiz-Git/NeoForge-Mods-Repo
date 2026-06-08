@@ -1,1879 +1,583 @@
-o mod não funciona, eu ponho o bloco no chao, e muita das vezes o lado do monitor não tá certo e em si ao juntar não forma um montir com texturas conectadas e nem abe browser nenhum, ve as logs se for preciso e adiciona debug (logs) ao mod e etc
-Thought: 1.4s
-The user says the mod isn't working properly - the monitor placement face isn't always correct, textures don't connect properly, and no browser opens. They want me to look at logs and add debug logging.
+colocaste logs para a preview já que ela não funciona?
+Thought: 759ms
+The user is asking: "Did you put logs for the preview since it doesn't work?"
 
-Let me first look at the client logs to understand what's happening, then review the relevant code files to fix the issues.
+Let me check the BrowserScreen.kt file to see what I've done for logging in the preview rendering. I already added logging there. Let me show the user what I've done.
+→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\gui\BrowserScreen.kt [offset=177, limit=45]
+Thought: 882ms
+Yes, I already added logging for the preview. The user is just confirming. Let me respond clearly that yes, I added logs that will print:
 
-Let me check the latest logs first.
-# Todos
-[•] Check client logs for errors
-[ ] Review MonitorBlock placement facing logic
-[ ] Review rectangle detection (MonitorShapeDetector)
-[ ] Review browser creation/activation (ClientBrowserCache, InputHandler)
-[ ] Add debug logging throughout
-[ ] Rebuild and test
-Thought: 365ms
-Let me check the latest logs and review the key source files.
-# Check Minecraft client logs
-$ Get-ChildItem -LiteralPath "$env:APPDATA\.minecraft\logs" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Write-Host "=== $($_.Name) === $( $_.LastWriteTime )"; Get-Content $_.FullName -Tail 200 }
-=== latest.log === 01/16/2026 17:28:00
-[17:27:39] [Client thread/WARN]: Skipping bad option: lastServer:
-[17:27:39] [Client thread/WARN]: Skipping bad option: 
-[17:27:39] [Client thread/WARN]: Skipping bad option: 
-[17:27:39] [Client thread/WARN]: Skipping bad option: 
-[17:27:39] [Client thread/WARN]: Skipping bad option: key_key.pickItem:key.mouse.middle
-[17:27:39] [Client thread/WARN]: Skipping bad option: key_key.playerlist:key.keyboard.tab
-[17:27:39] [Client thread/WARN]: Skipping bad option: key_key.advancements:key.keyboard.l
-[17:27:39] [Client thread/WARN]: Skipping bad option: key_key.hotbar.5:key.keyboard.5
-[17:27:39] [Client thread/WARN]: Skipping bad option: key_key.hotbar.6:key.keyboard.6
-…
-Click to expand
-Thought: 671ms
-That's the vanilla Minecraft log, not the modded one. Let me check the Modrinth profile's logs.
-# Check Modrinth profile structure
-$ Get-ChildItem -LiteralPath "C:\Users\Strefiz\AppData\Roaming\ModrinthApp\profiles\Server-teste" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
-.cache
-config
-crash-reports
-data
-datapacks
-defaultconfigs
-downloads
-logs
-mods
-resourcepacks
-…
-Click to expand
-Thought: 345ms
-Let me check the Modrinth profile's logs directory.
-# Check Modrinth profile logs
-$ Get-ChildItem -LiteralPath "C:\Users\Strefiz\AppData\Roaming\ModrinthApp\profiles\Server-teste\logs" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object { Write-Host "=== $($_.Name) === $($_.LastWriteTime)"; Get-Content $_.FullName -Tail 100 }
-...
+1. When browser is null in cache
+2. When scaled area is null (shape null)
+3. The texId and area dimensions
 
-o as a result
-[06Jun2026 16:20:37.586] [Render thread/DEBUG] [mixin/]: moreculling.mixins.json:gui.SodiumOptionsGUIMixin from mod moreculling->@Inject::moreculling$addCacheRefreshButton(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V doesn't use it's CallbackInfo
-[06Jun2026 16:20:37.586] [Render thread/DEBUG] [mixin/]: moreculling.mixins.json:gui.SodiumOptionsGUIMixin from mod moreculling->@Inject::moreculling$addCacheRefreshButton(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V has 0 override(s) in child classes
-[06Jun2026 16:20:37.586] [Render thread/DEBUG] [mixin/]: moreculling.mixins.json:gui.SodiumOptionsGUIMixin from mod moreculling->@Inject::moreculling$addCacheRefreshButton(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V won't be passed a CallbackInfo as a result
-[06Jun2026 16:20:37.586] [Render thread/DEBUG] [mixin/]: lambdynlights.mixins.json:sodium.SodiumOptionsGuiMixin from mod lambdynlights_runtime->@Inject::lambdynlights$onInit(Lnet/minecraft/client/gui/screens/Screen;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V doesn't use it's CallbackInfo
-[06Jun2026 16:20:37.586] [Render thread/DEBUG] [mixin/]: lambdynlights.mixins.json:sodium.SodiumOptionsGuiMixin from mod lambdynlights_runtime->@Inject::lambdynlights$onInit(Lnet/minecraft/client/gui/screens/Screen;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V has 0 override(s) in child classes
-[06Jun2026 16:20:37.586] [Render thread/DEBUG] [mixin/]: lambdynlights.mixins.json:sodium.SodiumOptionsGu…
-Click to expand
-Thought: 1.9s
-The logs don't show any of our mod's output (no debug logs). I can see the launcher_log.txt shows the client started successfully and the player was able to join the server and set themselves to creative mode. The debug.log is mostly mixin stuff from other mods.
+All at INFO level so they'll appear in the log.
+Sim, já adicionei. No renderBrowserPreview do BrowserScreen.kt:180-203 tens 3 logs INFO:
+1. "no browser in cache for ..." — se ClientBrowserCache.get() devolver null
+2. "null scaled area (shape null?)" — se monitor.shape estiver null
+3. "texId={} area={}x{} isGood={}" — mostra o texture ID, área do preview, e se é > 0
+O jar já está em build/libs/webbrowser-0.1.0.jar. Copia para a pasta de mods do cliente e testa — depois vê no logs/latest.log as linhas [BrowserScreen], [Monitor] e [ShapeDetector] para perceberes onde pára o fluxo.
+▣  Build · Big Pickle · 8.7s
+e tbm adiciona ao .md para adicionar campos que altera entre audio do ecra vir tipo direto po player ou vindo do bloco do meio do ecra ou idk do genero; um campo para alterar o volume do ecra (obviamente vai alterar para todos)
+Thought: 2.2s
+The user wants me to add new fields to the BrowserScreen GUI:
+1. Audio output mode: either player directly or from the center block of the screen (or similar)
+2. Volume field for the screen (changes for all)
 
-Let me now look at all the source files to understand the issues:
+Let me first understand the current GUI layout, then add these fields.
 
-1. Placement facing - MonitorBlock's use and placement logic
-2. Rectangle detection - MonitorShapeDetector
-3. Browser creation/activation - ClientBrowserCache, InputHandler
+Let me read the current BrowserScreen to understand the layout and then plan the additions.
 
-Let me read all the relevant files.
-# Todos
-[✓] Check client logs for errors
-[•] Review MonitorBlock placement facing logic
-[ ] Review rectangle detection (MonitorShapeDetector)
-[ ] Review browser creation/activation (ClientBrowserCache, InputHandler)
-[ ] Add debug logging throughout
-[ ] Rebuild and test
-Thought: 536ms
-Let me read all the key source files at once to understand the full picture.
-→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlock.kt 
-→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorShapeDetector.kt 
+The current right panel has:
+- URL field (y=40)
+- Go button (y=65) + Apply Res button (y=65)
+- Pixels/Block field (y=110)
+- Preview W field (y=180)
+- Preview H field (y=220)
+- Apply Preview button (y=245)
+
+I need to also add this information to the .md file. Wait, which .md? Let me check if there's a documentation file.
+
+Actually, the user said "adiciona ao .md" - they want me to add documentation to a .md file. But I should NOT proactively create documentation files unless explicitly requested. The user IS explicitly requesting it now, so I should.
+
+Let me first find if there's an existing .md file in the project.
+✱Glob "**/*.md" in . (6 matches)
+Thought: 775ms
+There's a PLANO_CORRECOES.md file. Let me read it to see what format it uses. Also, let me read the BrowserScreen.kt again to understand the full current layout, and also the MonitorBlockEntity.kt to understand what fields exist.
+
+Let me first read the existing md file and the current BrowserScreen.
+→Read MinecraftWebBrowserExplorerMod\PLANO_CORRECOES.md 
+→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\gui\BrowserScreen.kt 
 →Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlockEntity.kt 
-→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\ClientBrowserCache.kt 
-→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\input\InputHandler.kt 
-Thought: 555ms
-Now let me look at the MonitorShapeDetector since it's in the logic package, not block:
-✱Glob "**/MonitorShapeDetector.kt" (1 match)
-✱Glob "**/MonitorShape.kt" 
-Thought: 689ms
-Let me read MonitorShapeDetector.kt and also find where MonitorShape is defined.
-→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\logic\MonitorShapeDetector.kt 
-✱Grep "class MonitorShape|data class MonitorShape" (2 matches)
-Thought: 54.6s
-Now I have a full picture. Let me analyze the issues:
+Thought: 11.1s
+The user wants to add two new features to the GUI:
 
-Problem 1: Placement facing
-MonitorBlock.getStateForPlacement uses context.nearestLookingDirection.opposite
+1. Audio output mode — somewhere audio comes from: either directly from the player (like normal Minecraft sounds) or from the center block of the screen (positional audio from a specific block position). The user said "audio do ecra vir tipo direto po player ou vindo do bloco do meio do ecra ou idk do genero" — "audio from the screen either directly to the player or coming from the center block of the screen or something like that".
 
-This is the nearestLookingDirection, which returns the face of the block the player is looking at. The opposite of that would place the screen face away from the player, which is correct. But nearestLookingDirection might not be the right choice - it returns the nearest direction to the player's look vector, which is always one of the 6 axis directions. The problem is that nearestLookingDirection returns the face of the block that the player is looking AT (e.g., if looking at the north face of a block, it returns NORTH). The opposite of that would point the screen face toward the player.
-
-Wait, actually nearestLookingDirection - let me think. Looking at the BlockPlaceContext:
-- nearestLookingDirection returns the direction the player's look vector is most closely aligned with
-- The opposite of that would be the direction the player is looking FROM
+2. Volume field — a volume control for the screen audio (obviously changes for everyone).
 
-So if the player is looking north, nearestLookingDirection = NORTH, opposite = SOUTH. The screen face would be SOUTH (toward the player). That seems correct.
+So I need to:
 
-But wait - what about when placing on a wall? The getStateForPlacement doesn't use context.clickedFace at all. If the player places on the side of a block, the resulting facing should be based on the clicked face. For a wall-mounted monitor, the screen should face outward from the wall.
+1. Add fields to MonitorBlockEntity:
+   - audioMode: Int (0 = player, 1 = screen center block, maybe 2+ for other positions)
+   - volume: Float (0.0 to 1.0, default something like 1.0)
 
-Actually, for a wall - if the player clicks the north face of a block, the monitor should be placed on that face, with the screen facing north (outward from the wall). But nearestLookingDirection.opposite gives SOUTH in this case, which is wrong.
+   Actually, the user said "um campo para alterar o volume do ecra (obviamente vai alterar para todos)" — so volume applies to everyone listening.
 
-Wait no, let me reconsider. nearestLookingDirection is the direction the player's eyes are looking at, not the face they clicked. So if you're looking north and clicking the north face of a block, nearestLookingDirection = NORTH, opposite = SOUTH. The screen faces SOUTH, which is toward the player but inside the wall. That's wrong.
+2. Add fields to BrowserScreen GUI:
+   - Audio mode selector (dropdown or cycle button)
+   - Volume slider or field
 
-The correct behavior should be: the screen face is context.clickedFace.opposite (the face opposite the one clicked, i.e., outward from the wall).
+3. Persist them in NBT (save/load)
 
-Actually, let me think about this more carefully:
-- When you place a block on a wall, clickedFace is the face of the existing block that was clicked.
-- The new block should be placed with its screen face pointing outward from the wall, which is clickedFace itself (pointing away from the wall).
-  
-Wait, no. If you click the NORTH face of a wall, the block is placed on the north side. The screen should face NORTH (away from the wall, toward the player if they're standing to the north). So facing = clickedFace makes sense.
+4. Possibly sync them to server via a new packet
 
-But for floor/ceiling placement:
-- Floor: clickedFace = UP, screen should face upward (toward the player) -> facing = UP
-- Ceiling: clickedFace = DOWN, screen should face downward -> facing = DOWN
+5. Update the .md file (PLANO_CORRECOES.md or another .md?)
 
-So the formula should just be facing = context.clickedFace. Let's check what the current code does:
-context.nearestLookingDirection.opposite
+6. But actually — this is a GUI feature. The audio itself isn't implemented yet (no MCEF audio handling). The user is asking to just ADD THE FIELDS to the GUI and to the .md for now, as a TODO/plan.
 
-If the player looks north and clicks the north face of a block:
-- nearestLookingDirection = NORTH (looking north)
-- opposite = SOUTH
-- Result: screen faces SOUTH (wrong! should be NORTH)
+Wait, let me re-read the user's message: "adiciona ao .md para adicionar campos que altera entre audio do ecra vir tipo direto po player ou vindo do bloco do meio do ecra ou idk do genero; um campo para alterar o volume do ecra (obviamente vai alterar para todos)"
 
-So the placement facing is definitely broken for wall placement. It should use the clicked face.
+So they want me to:
+1. Add to the .md file entry for these fields
+2. Add the actual GUI fields in BrowserScreen
+3. Add the backing data in MonitorBlockEntity
 
-Wait, but there might be a reason for using nearestLookingDirection. When placing a full block (not against a wall), the clickedFace is the face of a neighboring block that was clicked. If the player just places in mid-air (on a floor), the clickedFace is the top of the block below.
+But actually, the audio implementation itself (MCEF audio output) is a separate concern. The user just wants the GUI fields and the data model for now.
 
-Let me reconsider:
-- Floor placement: clickedFace = UP, screen should face UP -> context.clickedFace works
-- Ceiling placement: clickedFace = DOWN, screen should face DOWN -> context.clickedFace works  
-- Wall placement north side: clickedFace = NORTH, screen should face NORTH -> context.clickedFace works
-- Wall placement south side: clickedFace = SOUTH, screen should face SOUTH -> context.clickedFace works
+Hmm, but actually, should I implement the actual audio or just add the GUI fields? The user seems to want both - the .md documentation AND the actual fields in the GUI. Let me add both.
 
-So it should be context.clickedFace not nearestLookingDirection.opposite.
+For audio mode options:
+- "Player" (0) — audio plays directly to the player (like normal Minecraft sounds at full volume regardless of position)
+- "Center Block" (1) — audio plays from the center block of the monitor (positional audio)
 
-Problem 2: Rectangle detection with single blocks
-The MIN_SIZE is 2, meaning a 1x1 monitor can't be formed. That might be intentional for the minimum size constraint, but the user might want a single block to act as a 1x1 monitor. Let me check... the user said "muita das vezes o lado do monitor não tá certo e em si ao juntar não forma um montir com texturas conectadas e nem abe browser nenhum" — the monitor side isn't right, textures don't connect, and no browser opens.
+For volume:
+- Simple 0-100 integer or 0.0-1.0 float
+- Applied to all
 
-So the key issues are:
-1. Placement facing wrong
-2. Rectangle detection might have issues
+Let me implement this step by step.
 
-Let me also look at the getPerpendicularDirections function more closely:
-Direction.NORTH, Direction.SOUTH -> Pair(Direction.EAST, Direction.UP)
-Direction.EAST, Direction.WEST -> Pair(Direction.NORTH, Direction.UP)
-Direction.UP, Direction.DOWN -> Pair(Direction.NORTH, Direction.EAST)
+First, let me plan the implementation:
 
-For NORTH/SOUTH: right is EAST, down is UP. This means the rectangle expands to the right (east) and downward (up = upward). But wait, for a monitor facing NORTH, the screen is on the north side. Looking at the screen from the north:
-- Right should be EAST ✓
-- Down should be DOWN (not UP!)
+1. MonitorBlockEntity — add audioMode: Int = 0, volume: Float = 1.0f, persist in NBT
+2. BrowserScreen — add audio mode cycle button, add volume field
+3. PLANO_CORRECOES.md — add entry for audio fields
+4. Network — possibly a packet to sync audio settings to server
 
-If downDir = UP, then going "down" means going in the positive Y direction, which is upward. The rectangle would expand upward, but the top-left should be the top-left of the screen as the player sees it.
+Wait, for volume: the user says "obviamente vai alterar para todos" — so it changes for everyone. This needs to be synced to the server (like pixelsPerBlock). So I need a packet similar to MonitorResolutionPacket.
 
-Wait, let me re-read the code more carefully:
-
-In findTopLeft:
-while (true) {
-    val leftPos = pos.relative(rightDir.opposite)
-    if (!isMonitorBlock(leftPos, level, facing)) break
-    pos = leftPos
-}
-while (true) {
-    val upPos = pos.relative(downDir.opposite)
-    if (!isMonitorBlock(upPos, level, facing)) break
-    pos = upPos
-}
+Let me also think about the GUI layout. Currently the right panel has:
 
-rightDir.opposite is the "left" direction. So it moves left until there's no block.
-downDir.opposite is the "up" direction. So it moves up until there's no block.
+Y=28: "URL:" label
+Y=40: [urlField (EditBox)]
+Y=65: [Go Button] [Apply Res Button]
+Y=98: "Pixels/Block:" label
+Y=110: [pixelsField]
+Y=168: "Preview W:" label
+Y=180: [previewWField]
+Y=208: "Preview H:" label
+Y=220: [previewHField]
+Y=245: [Apply Preview Button]
 
-For NORTH facing:
-- rightDir = EAST, so left = WEST. Moves west to find left edge. ✓
-- downDir = UP, so up = DOWN. Moves down to find top edge. 
+I need to fit:
+- Audio mode selector (button/label)
+- Volume field
 
-WAIT. If downDir = UP, then downDir.opposite = DOWN. Moving DOWN (negative Y) from origin to find "up". That means the scan moves downward to find the top. That seems inverted.
+Let me move things around or add them below the Apply Preview button. I'll put:
+Y=270: "Audio Mode:" label
+Y=290: [Audio Mode Button - cycles options]
+Y=315: "Volume:" label  
+Y=335: [Volume Field]
+Y=360: [Apply Audio Button]
 
-Let me think about this with a concrete example. Say we place a monitor on a wall facing NORTH. From the player's perspective looking at the monitor:
-- Left = West
-- Right = East
-- Up = Up (positive Y)
-- Down = Down (negative Y)
+Actually, since these are new features that need to be synced to the server, let me also check if there's an existing audio packet system. Actually, I don't think there's any MCEF audio integration in this mod at all. The user is asking to ADD the FIELDS for a future audio implementation.
 
-The "top-left" corner is the highest, leftmost block. So:
-- From origin, move left (west) until no more blocks → finds left edge
-- From left edge, move up (positive Y) until no more blocks → finds top edge
+Let me keep it simple — just add the fields to the GUI and the data model. For the "audio mode" concept, since the user said "ou idk do genero" (or something like that), they're not 100% sure. So I'll make a simple enum/cycle.
 
-But in the code:
-- downDir = UP
-- rightDir = EAST
-- downDir.opposite = DOWN (negative Y!)
+Let me now implement:
 
-This is wrong! Moving DOWN finds the bottom, not the top. But the function is called findTopLeft. 
+1. Add audioMode and volume to MonitorBlockEntity with NBT persistence
+2. Add GUI fields in BrowserScreen
+3. Add a packet for syncing audio settings (like MonitorResolutionPacket but for audio)
+4. Update the .md file
 
-Wait, actually no. The variable downDir is the direction that "down" points to in the screen's coordinate system. For NORTH facing:
-- Right on screen = EAST (positive X)
-- Down on screen = negative Y = DOWN
+Actually wait, I need to check the network system first to see what packets exist and how they're registered.
+→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\network\Network.kt 
+→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\network\MonitorResolutionPacket.kt 
+Thought: 3.5s
+Now I understand the pattern. Let me implement:
 
-So downDir should be DOWN, not UP!
+1. Create MonitorAudioPacket.kt - a new packet for syncing audio mode and volume
+2. Add audioMode: Int and volume: Float to MonitorBlockEntity with NBT persistence
+3. Update BrowserScreen with audio mode button and volume field
+4. Register the new packet in Network.kt
+5. Update PLANO_CORRECOES.md with the new audio fields
 
-Similarly for EAST/WEST facing:
-- Right on screen = NORTH (positive Z) or SOUTH (negative Z) depending on facing
-- Down on screen = DOWN (negative Y)
+For the audio mode, I'll use an enum:
+- PLAYER (0) - audio plays directly to the player
+- CENTER_BLOCK (1) - audio plays from the center block of the monitor
 
-For UP/DOWN facing:
-- Right on screen = depends
-- Down on screen = depends
-
-Let me recheck:
-
-For NORTH: you're looking at the screen from the north side. On the screen:
-- right = EAST ✓
-- down = DOWN not UP!
-
-For SOUTH: you're looking at the screen from the south side. On the screen:
-- right = WEST (because from the south, east is to your left)
-- down = DOWN
-
-So for NORTH: rightDir = EAST, downDir = DOWN
-For SOUTH: rightDir = WEST, downDir = DOWN
-
-But the code has:
-Direction.NORTH, Direction.SOUTH -> Pair(Direction.EAST, Direction.UP)
-
-Both have right=EAST and down=UP. This seems wrong for SOUTH (right should be WEST) and down should always be DOWN, not UP.
-
-Actually wait, let me reconsider. The code uses downDir as the direction of increasing row number. The "top-left" is found by going opposite to both rightDir and downDir. So if downDir = UP, then downDir.opposite = DOWN, so it goes DOWN to find the top. But going DOWN gives the bottom, not the top.
-
-Unless... the coordinate system has Y increasing downward? No, in Minecraft, Y increases upward.
-
-I think the bug is: downDir should be DOWN for all facings (since the screen's "down" direction is always toward negative Y, unless the monitor is on the ceiling or floor).
-
-Let me think about UP/DOWN facings:
-- UP (floor monitor, screen faces up): On the screen looking down from above:
-  - right = EAST (positive X)
-  - down = SOUTH (positive Z) or NORTH?
-  
-  Actually, from above looking down, "down" on the screen would be SOUTH (positive Z) if the player is looking south. But it should be relative to the player... hmm.
-  
-  Actually, for a floor monitor (UP facing), the "down" direction on the screen could be either NORTH or SOUTH depending on the player's orientation. But since the Part is relative to the screen's coordinate system, for UP:
-  - rightDir could be EAST
-  - downDir could be SOUTH
-  - So top-left is west-north corner
-  
-  For DOWN (ceiling monitor, screen faces down):
-  - Looking up at the screen from below:
-  - right = EAST
-  - down = NORTH (because from below, south is "up" on the screen)
-  
-  Wait, this is getting confusing. Let me look at actual monitor hardware conventions.
-
-For a wall-mounted TV (NORTH facing, you look at it from the north):
-- Screen right = East
-- Screen down = Down (negative Y)
-- Top-left = West-Up corner
-
-So: rightDir = EAST, downDir = DOWN, topLeft from findTopLeft would go:
-- Left from origin (west) until edge
-- Up from leftmost (positive Y) until edge
-
-That gives West-Up corner. Which is correct!
-
-But downDir.opposite = UP (positive Y), and the code moves in downDir.opposite direction to find the "top". So downDir.opposite = UP → moves positive Y. That's correct for finding the top.
-
-Wait, but I said downDir = UP in the code, and downDir.opposite = DOWN (negative Y). That moves DOWN to find the "top", which is wrong!
-
-Unless... naming is confusing. Let me re-read:
-
-while (true) {
-    val upPos = pos.relative(downDir.opposite)
-    if (!isMonitorBlock(upPos, level, facing)) break
-    pos = upPos
-}
-
-If downDir = UP, then downDir.opposite = DOWN. So it moves downward (negative Y). The variable is named upPos but it's actually going down. This seems like the naming is wrong, or the direction is wrong.
-
-I think the issue is that getPerpendicularDirections returns the wrong directions. For NORTH facing:
-- rightDir should be EAST ✓
-- downDir should be DOWN (not UP!) ✗
-
-With downDir = DOWN:
-- downDir.opposite = UP 
-- Moving UP finds the top edge ✓
-- findTopLeft returns the top-left corner ✓
-- measureHeight with downDir = DOWN would measure increasing downward, which is correct ✓
-
-So the fix is:
-Direction.NORTH -> Pair(Direction.EAST, Direction.DOWN)
-Direction.SOUTH -> Pair(Direction.WEST, Direction.DOWN)
-Direction.EAST -> Pair(Direction.SOUTH, Direction.DOWN)
-Direction.WEST -> Pair(Direction.NORTH, Direction.DOWN)
-Direction.UP -> Pair(Direction.EAST, Direction.SOUTH)
-Direction.DOWN -> Pair(Direction.EAST, Direction.NORTH)
-
-Wait, let me verify each:
-
-NORTH (looking at screen from north):
-- Screen right = EAST ✓
-- Screen down = DOWN ✓
-- So rightDir = EAST, downDir = DOWN
-- findTopLeft: go WEST (rightDir.opposite) then go UP (downDir.opposite) → west-up corner ✓
-
-SOUTH (looking at screen from south):
-- Screen right = WEST (from south, east is to your left)
-- Screen down = DOWN
-- So rightDir = WEST, downDir = DOWN
-- findTopLeft: go EAST (rightDir.opposite) then go UP (downDir.opposite) → east-up corner ✓
-- Wait, for SOUTH, the top-left corner from the player's perspective looking north at the south face:
-  - The player is to the south, looking north
-  - The screen face is on the south side of blocks
-  - From the player's view, right = WEST, left = EAST
-  - So top-left = east side, up
-  - findTopLeft: go EAST (west.opposite) → yes, finds east edge, then UP → finds top. ✓
-
-EAST (looking at screen from east):
-- Screen right = ? When looking from east at the east face:
-  - Right should be SOUTH (if you're looking west at the east face, south is to your right)
-  - Down = DOWN
-- So rightDir = SOUTH, downDir = DOWN
-- findTopLeft: go NORTH (south.opposite) then UP → north-up corner ✓
-
-WEST (looking at screen from west):
-- Screen right = NORTH (looking east at west face, north is to your right)
-- Down = DOWN
-- So rightDir = NORTH, downDir = DOWN
-- findTopLeft: go SOUTH (north.opposite) then UP → south-up corner ✓
-
-UP (floor, looking down at screen from above):
-- Looking at the screen from above (player is above, looking down)
-- Right = EAST (from above, looking down, east is to the right)
-- Down = SOUTH (from above, looking down, south is "down" on the screen)
-- So rightDir = EAST, downDir = SOUTH
-- findTopLeft: go WEST (east.opposite) then NORTH (south.opposite) → west-north corner ✓
-
-DOWN (ceiling, looking up at screen from below):
-- Looking up at the screen from below (player is below, looking up)
-- Right = EAST (from below, looking up, east is still to the right)
-- Down = NORTH... wait, from below looking up, things are mirrored. Let me think.
-  
-  If you're standing under a ceiling monitor looking up:
-  - The screen faces downward
-  - From below, looking up: right = EAST, but "down" on the screen would be... hmm.
-  
-  Actually, if you're lying on your back looking up at a screen on the ceiling:
-  - Your right is still east
-  - Your "down" (toward your feet) is... depends which way you face
-  
-  I think for ceiling monitors, the convention should be:
-  - From below looking up: right = EAST
-  - From below looking up: "down" on the screen = SOUTH (if the player faces south)
-  
-  But this is arbitrary. Let's keep it consistent: rightDir = EAST, downDir = NORTH.
-  - findTopLeft: go WEST then SOUTH → west-south corner
-
-Actually, I realize that for ceiling monitors, it's confusing. The player stands under it looking up. The screen's coordinate system:
-- From below: X increases east, Z increases south
-- "Down" on the screen from below: if you're looking up, your head is tilted back. "Down" toward your feet depends on your facing.
-  
-Let me just keep it simple and consistent. For UP facing (floor):
-- right = EAST, down = SOUTH
-- topLeft = west-north corner (south-west block from origin is the top-left)
-
-For DOWN facing (ceiling):
-- From below looking up: right should be EAST (east is always east)
-- "Down" from below: moving south (positive Z) is "downward" on the screen from the viewer's perspective
-- So down = SOUTH
-- But wait, if down = SOUTH, then downDir.opposite = NORTH. Moving NORTH from origin finds the top. That would mean the "top" of the ceiling screen is the north-most block. But from below looking up, the "top" (furthest from viewer) is the... 
-
-This is really tricky. Let me look at how other mods handle this.
-
-Actually, for UP/DOWN facing, the rightDir and downDir define the orientation of the rectangle on the horizontal plane (XZ). For UP:
-- rightDir = EAST, downDir = SOUTH means the rectangle extends east (right) and south (down). Top-left is west-north corner.
-- This makes sense if the player is standing on the north-west side of the screen looking at it.
-
-For DOWN (ceiling):
-- If we use rightDir = EAST, downDir = NORTH, then the rectangle extends east and north. Top-left is west-south corner.
-- The player standing under it looking up: from below, "down" on the screen (toward feet) would be south, but the code says downDir = NORTH. It's confusing.
-
-I think for now, the most important fix is:
-1. Fix placement facing
-2. Fix downDir to be DOWN for horizontal facings (NORTH/SOUTH/EAST/WEST)
-3. Fix rightDir for SOUTH to be WEST
-
-Let me also check: what are stepX, stepY, stepZ for Direction values?
-
-Actually, let me not overthink this and just fix the likely bugs:
-
-Key bug 1: getStateForPlacement should use context.clickedFace instead of context.nearestLookingDirection.opposite
-
-Key bug 2: getPerpendicularDirections returns wrong down direction for horizontal facings (should be DOWN not UP)
-
-Key bug 3: getPerpendicularDirections returns wrong right direction for SOUTH (should be WEST not EAST)
-
-Let me also look at the block models and multipart blockstate to understand if the visual model rotation is correct, since the user says "texturas não conectam direito."
-
-Let me read the blockstate JSON and models.
+For volume, I'll use a float 0.0f to 1.0f but in the GUI I'll show it as an integer percentage (0-100) for simplicity.
+
+Let me start implementing.
+
+Actually wait - I need to think about whether these fields need to be synced to the server at all. The audio would be a client-side concern (CEF audio). But the user says "obviamente vai alterar para todos" - so maybe the volume applies to all players. In that case, it needs to be server-side.
+
+Actually, even if audio is client-side only, the volume and audio mode should still be stored per-monitor and synced to the server so they persist. Let me add them to the BE and sync via a new packet.
+
+But actually, for simplicity, maybe I should just store them locally on the client BE (like pixelsPerBlock which IS synced). Let me follow the same pattern as MonitorResolutionPacket.
+
+Let me implement now.
 # Todos
-[✓] Check client logs for errors
-[✓] Review MonitorBlock placement facing logic
-[•] Review rectangle detection (MonitorShapeDetector)
-[ ] Review browser creation/activation (ClientBrowserCache, InputHandler)
-[ ] Add debug logging throughout
-[ ] Rebuild and test
-Thought: 467ms
-Let me also check the blockstate JSON and models to understand how the visual part works.
-✱Glob "**/resources/assets/webbrowser/**" (10 matches)
-Thought: 441ms
-Let me read the blockstate JSON and the models.
-→Read MinecraftWebBrowserExplorerMod\src\main\resources\assets\webbrowser\blockstates\monitor_block.json 
-→Read MinecraftWebBrowserExplorerMod\src\main\resources\assets\webbrowser\models\block\monitor_block.json 
-→Read MinecraftWebBrowserExplorerMod\src\main\resources\assets\webbrowser\models\block\monitor_block_on.json 
-→Read MinecraftWebBrowserExplorerMod\src\main\resources\assets\webbrowser\models\block\monitor_block_off.json 
-→Read MinecraftWebBrowserExplorerMod\src\main\resources\assets\webbrowser\models\item\monitor_block.json 
-Thought: 7.3s
-Now I see the issues clearly:
-
-Issue 1: Placement facing
-MonitorBlock.getStateForPlacement uses context.nearestLookingDirection.opposite — this is the direction OPPOSITE to where the player is looking. But it should be the CLICKED FACE (where the player actually places the block against).
-
-Fix: context.clickedFace
-
-Issue 2: getPerpendicularDirections wrong down direction
-For NORTH/SOUTH/EAST/WEST facings:
-- downDir is set to UP, but should be DOWN
-- This means:
-  - findTopLeft goes DOWN (up.opposite) from origin to find the "top" — but going DOWN finds the bottom!
-  - The whole rectangle detection is inverted vertically
-
-Issue 3: getPerpendicularDirections wrong right for SOUTH
-For SOUTH facing: rightDir = EAST, but from the south (looking north at the south face), right should be WEST.
-
-Issue 4: No browser because we removed MCEF.initialize() — but MCEF's own mod initializes it. So this is probably fine.
-
-Wait, but the user says "não abe browser nenhum". Let me check — when InputHandler.activate() is called, it creates a browser via MCEF.createBrowser(). But the URL screen probably opens first (on right-click). The user right-clicks the block.
-
-Actually, looking at ClientGameEvents.onMouseClick:
-if (mc.player?.isShiftKeyDown == true) {
-    InputHandler.openUrlScreen(be)
-} else {
-    InputHandler.activate(be.master())
-}
-
-So right-click without shift activates the monitor. Shift+right-click opens URL screen.
-
-But wait — activate() creates the browser, but then what? The browser renders through MonitorBlockEntityRenderer. Let me check the renderer.
-
-Actually, I also notice that the blockstate JSON only faces north for the screen texture. The model has north as the screen face. Rotation works through y and x rotations. So:
-- NORTH facing: model has north as screen ✓
-- SOUTH facing: model rotated 180° on Y, so south texture becomes the screen ✓
-- EAST facing: model rotated 90° on Y, so east texture becomes the screen ✓
-- WEST facing: model rotated 270° on Y, so west texture becomes the screen ✓
-- UP facing: model rotated 270° on X (x: 270), which points north face upward ✓
-- DOWN facing: model rotated 90° on X, which points north face downward ✓
-
-Good, the models look correct.
-
-Now let me check the renderer:
-→Read MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\renderer\MonitorBlockEntityRenderer.kt 
-✱Glob "**/client/renderer/*.kt" (2 matches)
-Thought: 2m 30s
-Now I have the full picture. Let me identify all the bugs:
-
-Bug 1: Placement facing (MonitorBlock.kt:61)
-val facing = context.nearestLookingDirection.opposite
-Should be:
-val facing = context.clickedFace
-
-Bug 2: getPerpendicularDirections in MonitorShapeDetector.kt:141-147
-Current:
-Direction.NORTH, Direction.SOUTH -> Pair(Direction.EAST, Direction.UP)
-Direction.EAST, Direction.WEST -> Pair(Direction.NORTH, Direction.UP)
-Direction.UP, Direction.DOWN -> Pair(Direction.NORTH, Direction.EAST)
-
-For NORTH: right = EAST ✓, down = UP ✗ (should be DOWN)
-For SOUTH: right = EAST ✗ (should be WEST), down = UP ✗ (should be DOWN)
-For EAST: right = NORTH ✗ (should be SOUTH), down = UP ✗ (should be DOWN)
-For WEST: right = NORTH ✓ (should be NORTH), down = UP ✗ (should be DOWN)
-For UP: right = NORTH ✗ (let me think...), down = EAST ✗
-For DOWN: right = NORTH ✗, down = EAST ✗
-
-Let me recalculate all:
-
-For NORTH (looking at screen from north side, screen faces north):
-- Right on screen = EAST
-- Down on screen = DOWN (negative Y)
-- So rightDir = EAST, downDir = DOWN
-
-For SOUTH (looking at screen from south side, screen faces south):
-- The player is on the south side, looking north at the south face
-- From the south, east is to the player's LEFT, west is to the RIGHT
-- Right on screen = WEST (not EAST!)
-- Down on screen = DOWN (negative Y)
-- So rightDir = WEST, downDir = DOWN
-
-For EAST (looking at screen from east side, screen faces east):
-- The player is on the east side, looking west at the east face
-- From the east, south is to the player's RIGHT
-- Right on screen = SOUTH
-- Down on screen = DOWN
-- So rightDir = SOUTH, downDir = DOWN
-
-For WEST (looking at screen from west side, screen faces west):
-- The player is on the west side, looking east at the west face
-- From the west, north is to the player's RIGHT
-- Right on screen = NORTH
-- Down on screen = DOWN
-- So rightDir = NORTH, downDir = DOWN
-
-For UP (floor monitor, screen faces up):
-- The player looks down at the screen from above
-- From above, east is to the RIGHT
-- "Down" on the screen (toward the player's feet if they're facing south) = SOUTH
-- So rightDir = EAST, downDir = SOUTH
-- topLeft = go WEST then NORTH → west-north corner
-
-For DOWN (ceiling monitor, screen faces down):
-- The player looks up at the screen from below
-- From below, east is still to the RIGHT
-- "Down" on the screen = NORTH (if the player's feet point south, then "down" = north from below)
-- Wait, this is confusing. Let me think about it differently.
-
-For ceiling, the screen is on the bottom face of blocks. When you look up from below:
-- Right on screen = EAST (east is always east)
-- Down on screen = SOUTH (from below, looking up, south is toward your feet if you face south)
-- But if facing south and looking up, south is actually "up" on the screen, not "down"
-
-OK, this is getting complicated. Let me try a different approach. For the screen coordinates on a downward-facing screen:
-- Imagine the screen is on the ceiling, you're standing under it looking up
-- The screen's "up" (farthest from you) is... 
-
-Actually, for ceiling monitors, I think it's better to think of it as:
-- The screen's horizontal coordinate increases with EAST
-- The screen's vertical coordinate increases with SOUTH
-- So rightDir = EAST, downDir = SOUTH
-
-For UP:
-- rightDir = EAST, downDir = SOUTH
-- topLeft from findTopLeft: go left (WEST), go up (NORTH) → west-north corner ✓
-
-Let me verify with hasBlocksOutside:
-For UP, check above the rectangle (row=-1): 
-- the code offsets by downDir.stepY * (-1) + rightDir.stepX * col
-- downDir = SOUTH, so downDir.stepY = 0, downDir.stepZ = 1 (positive Z)
-- downDir * (-1) = negative Z (north)
-- This checks north of the rectangle, which is correct for "above"
-
-For DOWN (ceiling), using rightDir = EAST, downDir = SOUTH:
-- topLeft: go left (WEST), go up (NORTH) → west-north corner
-- Rectangle extends east and south from there
-- From below looking up at the ceiling, the west-north corner is the top-left ✓
-
-OK, let me go with this:
-
-Direction.NORTH -> Pair(Direction.EAST, Direction.DOWN)
-Direction.SOUTH -> Pair(Direction.WEST, Direction.DOWN)
-Direction.EAST -> Pair(Direction.SOUTH, Direction.DOWN)
-Direction.WEST -> Pair(Direction.NORTH, Direction.DOWN)
-Direction.UP -> Pair(Direction.EAST, Direction.SOUTH)
-Direction.DOWN -> Pair(Direction.EAST, Direction.SOUTH)
-
-Bug 3: Coll/Row in renderer
-The renderer's column/row calculation must match the MonitorShapeDetector's coordinate system.
-
-Current renderer:
-when (facing) {
-    Direction.NORTH -> { col = -relX; row = relY }
-    Direction.SOUTH -> { col = relX; row = relY }
-    Direction.EAST -> { col = relZ; row = relY }
-    Direction.WEST -> { col = -relZ; row = relY }
-    Direction.UP -> { col = relX; row = -relZ }
-    Direction.DOWN -> { col = relX; row = relZ }
-    else -> return
-}
-
-If rightDir = EAST and downDir = DOWN for NORTH facing:
-- relX = pos.x - topLeft.x (how many blocks east from top-left)
-- relY = pos.y - topLeft.y (how many blocks up from top-left)
-- col should be the number of blocks to the right from top-left: that's relX (if rightDir = EAST)
-  Wait, but rightDir = EAST means moving in +X direction is "right". So col = relX... but the code has col = -relX.
-  
-  Actually, think about it. If top-left is west-up corner:
-  - Moving EAST from top-left increases X, which moves RIGHT on screen
-  - So col should be number of blocks east = relX
-  - But the code has col = -relX, which means col decreases as X increases. This is WRONG if rightDir = EAST.
-
-Wait no, I need to reconsider. Looking at the renderer code, relX is:
-val relX = entity.blockPos.x - shape.topLeft.x
-val relY = entity.blockPos.y - shape.topLeft.y
-val relZ = entity.blockPos.z - shape.topLeft.z
-
-And for NORTH: col = -relX
-
-This means col = -(x - topLeft.x) = topLeft.x - x. As x increases (moving east), col decreases. So col = 0 at topLeft (west-most) and col = width-1 at east-most. But that means col increases WESTWARD, not eastward. That's correct if rightDir = EAST and we want col to start at 0 at the left edge!
-
-Wait, if the top-left is the WEST-UP corner:
-- West-most block has relX = 0 (lowest X)
-- East-most block has relX = width-1 (highest X)
-- With col = -relX, the west-most block has col = 0, the east-most has col = -(width-1)... that's wrong.
-
-Hmm, but if topLeft.x is the LARGEST X value (east-most), then:
-- East-most block has relX = 0
-- West-most block has relX = -(width-1)
-- With col = -relX, east-most block has col = 0, west-most has col = width-1
-
-Wait, I need to be more careful. What is findTopLeft actually returning?
-
-findTopLeft:
-1. Start at origin
-2. Go LEFT (rightDir.opposite) until no more blocks
-3. Then go UP (downDir.opposite) until no more blocks
-
-For NORTH facing, rightDir = EAST, downDir = DOWN:
-- rightDir.opposite = WEST. So go WEST until no more blocks. This finds the west-most block.
-- downDir.opposite = UP. So go UP until no more blocks. This finds the top-most block (highest Y).
-
-So topLeft = (west-most X, highest Y, some Z). This is the top-left corner. ✓
-
-Then relX = pos.x - topLeft.x where topLeft.x is the smallest X value (west-most). For a block at col 0 (left edge): relX = topLeft.x - topLeft.x = 0. For a block at col 1: relX = (topLeft.x + 1) - topLeft.x = 1. So relX increases as we go east (right), which is correct.
-
-But the renderer code has: col = -relX. That would give col = 0 for relX = 0, col = -1 for relX = 1. That's inverted!
-
-Unless... the renderer expects a different coordinate system. Let me look at how uMin and uMax are used:
-
-val uMin = col.toFloat() / shape.width
-val uMax = (col + 1).toFloat() / shape.width
-
-So if col = 0, uMin = 0, uMax = 1/width. This is the UV for the leftmost column of a multi-block texture. If col increases, uMin increases, so the UV shifts right. ✓
-
-For NORTH facing with topLeft = west-up corner:
-- Block at relX = 0 (west edge, left edge) should have col = 0, uMin = 0
-- Block at relX = 1 should have col = 1, uMin = 1/width
-- So col should equal relX, not -relX!
-
-But the code has col = -relX, which means the UVs are inverted horizontally!
-
-Wait... am I sure about the coordinate system? Let me re-examine.
-
-Actually, I think the issue is simpler. The renderer and the shape detector must agree on the coordinate system. The renderer's col/row calculations must match how MonitorShapeDetector defines the rectangle.
-
-Let me trace through a concrete example:
-
-Say we place 2x2 monitors on a wall facing NORTH, at positions:
-- (5, 10, 5) = top-left
-- (6, 10, 5) = top-right  
-- (5, 9, 5) = bottom-left
-- (6, 9, 5) = bottom-right
-
-topLeft = (5, 10, 5), rightDir = EAST, downDir = DOWN
-width = 2, height = 2
-
-For the block at (5, 10, 5) (top-left):
-- relX = 5-5 = 0, relY = 10-10 = 0
-- col = -0 = 0 ✓ (left edge)
-- row = 0 ✓ (top edge)
-
-For the block at (6, 10, 5) (top-right):
-- relX = 6-5 = 1, relY = 10-10 = 0
-- col = -1 = -1? That would give uMin = -1/2, which is negative!
-
-So col = -relX is WRONG. With rightDir = EAST, col should be relX.
-
-But wait, what if the code was designed for rightDir = WEST? Let me check... if rightDir = WEST, then:
-- findTopLeft: go RIGHT (west.opposite = EAST) until no more blocks → finds east-most block
-- Then go UP (down.opposite = UP) → finds top-most
-
-So topLeft = (east-most, top-most). Then relX = pos.x - topLeft.x. For the east-most block, relX = 0, col = 0. For a block one to the west: relX = -1, col = -(-1) = 1. So col = 1 for a block that's one west of the east-most block. That means col increases westward. But uMin = 1/width for the west block and uMin = 0 for the east block... so the UV wraps correctly but the "left" and "right" are swapped.
-
-OK, I think I'm overanalyzing. Let me just trace through with the actual topLeft and the directions to make sure everything matches.
-
-The fundamental issue is: does the renderer's col/row calculation match the shape detector's coordinate system?
-
-The shape detector defines:
-- topLeft = findTopLeft(origin) which goes opposite to rightDir, then opposite to downDir
-- For NORTH facing: rightDir = ???, downDir = ???
-
-With the CURRENT code (downDir = UP, rightDir = EAST):
-- findTopLeft: go LEFT (west) then go DOWN (up.opposite = DOWN)
-- topLeft = (west-most X, lowest Y)
-- This is bottom-left corner, not top-left! The naming is wrong.
-- Then width measured in EAST direction, height measured in UP direction
-- hasBlocksOutside checks above (UP direction) and below (DOWN direction)
-
-So the current code finds the bottom-left corner as "topLeft", and the rectangle extends EAST and UP. The naming topLeft is wrong but the logic could still work consistently.
-
-Then in the renderer:
-- col = -relX where relX = pos.x - topLeft.x
-- If topLeft is west-most, then relX = 0 at left edge, relX = 1 one block east
-- But col = -relX = -1, -2... this gives negative columns.
-
-I think there's a systematic sign error. Let me reconsider the approach.
-
-I think the simplest fix is:
-1. Fix getPerpendicularDirections to return correct directions
-2. Fix col in renderer to be relX for EAST rightDir
-3. Fix row in renderer to be -relY for DOWN downDir (since relY is "up" from top-left, and row should increase downward)
-
-Wait, let me reconsider. If downDir = DOWN, then:
-- findTopLeft: go LEFT (rightDir.opposite), then go UP (downDir.opposite = UP)
-- topLeft = (west-most, highest Y)
-- width measured in EAST direction
-- height measured in DOWN direction (increasing Y... no, DOWN is negative Y)
-
-Hmm, downDir = DOWN means the direction of increasing row. DOWN means decreasing Y. So:
-- row 0 = top (highest Y)
-- row 1 = one step DOWN = lower Y
-- To measure height, we go DOWN (negative Y) and count
-
-Then in renderer:
-- relY = pos.y - topLeft.y (could be 0, -1, -2 for blocks below topLeft)
-- row should be 0 at top, 1 for next row down, etc.
-- Since downDir = DOWN and topLeft has highest Y, relY = -row (more negative for lower rows)
-- Wait: relY = pos.y - topLeft.y. If pos is topLeft, relY = 0. If pos is one below, relY = (topLeft.y - 1) - topLeft.y = -1.
-- So row = -relY would give 0, 1, 2, ...
-
-Let's verify with the example:
-topLeft = (5, 10, 5), rightDir = EAST, downDir = DOWN
-
-For block at (5, 10, 5) (top-left):
-- relX = 0, relY = 0
-- col = 0, row = 0 ✓
-
-For block at (5, 9, 5) (one below):
-- relX = 0, relY = -1
-- col = 0, row = 1 ✓ (row increases downward)
-
-For block at (6, 10, 5) (one right):
-- relX = 1, relY = 0
-- col = 1, row = 0 ✓ (col increases rightward)
-
-So the correct formulas for NORTH facing with rightDir=EAST, downDir=DOWN:
-- col = relX (not -relX!)
-- row = -relY
-
-Now let me do the same for all facings:
-
-SOUTH (rightDir = WEST, downDir = DOWN):
-- topLeft = go EAST (west.opposite), go UP (down.opposite = UP)
-- topLeft = (east-most, highest Y)
-- Rectangle extends WEST and DOWN
-
-For a block:
-- relX = pos.x - topLeft.x
-  - topLeft.x is largest X (east-most)
-  - relX = 0 at east edge, negative going west
-  
-- col should increase westward (right on screen)
-- col = -relX (since relX is negative or 0 on the screen)
-  
-- relY = pos.y - topLeft.y
-  - topLeft.y is highest Y
-  - relY = 0 at top, negative going down
-  
-- row = -relY (increase downward)
-
-Let me verify: topLeft = (10, 10, 5), blocks at (10, 10, 5), (9, 10, 5), (10, 9, 5), (9, 9, 5)
-So top-left of the screen (from player view) is at (10, 10, 5) and rightward is WEST.
-
-For block (10, 10, 5) (right edge, top): relX = 0, col = 0 ✓, relY = 0, row = 0 ✓
-For block (9, 10, 5) (left edge, top): relX = -1, col = 1 ✓, relY = 0, row = 0 ✓
-For block (10, 9, 5) (right edge, bottom): relX = 0, col = 0 ✓, relY = -1, row = 1 ✓
-
-OK so for SOUTH facing:
-- col = -relX (since rightDir = WEST, and we want col 0 at rightmost = relX 0)
-- row = -relY
-
-For EAST (rightDir = SOUTH, downDir = DOWN):
-- topLeft = go NORTH (south.opposite), go UP (down.opposite = UP)
-- topLeft = (north-most Z? Actually north-most in Z direction)
-  Wait, east/west have Z varying, not X.
-
-For EAST facing with rightDir = SOUTH:
-- Going LEFT from origin means going NORTH (south.opposite)
-- topLeft has the smallest Z (north-most)
-- Rectangle extends SOUTH (increasing Z) and DOWN (decreasing Y)
-
-relX = pos.x - topLeft.x → X varies
-relZ = pos.z - topLeft.z → for EAST, Z is the rightward axis
-
-Wait, with rightDir = SOUTH, the col increases as Z increases (moving south).
-With downDir = DOWN, row increases as Y decreases.
-
-For EAST facing:
-- col = relZ (since relZ = pos.z - topLeft.z, increases southward = rightward)
-- row = -relY
-
-Let me verify: topLeft at (5, 10, 5), blocks going south (Z increases) and down (Y decreases):
-For (5, 10, 6): relZ = 1, col = 1 ✓, relY = 0, row = 0 ✓
-For (5, 9, 5): relZ = 0, col = 0 ✓, relY = -1, row = 1 ✓
-
-Hmm, but currently the renderer has EAST as:
-Direction.EAST -> { col = relZ; row = relY }
-
-With downDir = DOWN (not UP), row should be -relY, not relY. So the renderer's row is wrong for EAST with the new downDir=DOWN.
-
-OK, let me just create a systematic table:
-
-For each facing, with rightDir and downDir:
-
-| Facing | rightDir | downDir | col formula | row formula |
-|--------|----------|---------|-------------|-------------|
-| NORTH  | EAST     | DOWN    | relX        | -relY       |
-| SOUTH  | WEST     | DOWN    | -relX       | -relY       |
-| EAST   | SOUTH    | DOWN    | relZ        | -relY       |
-| WEST   | NORTH    | DOWN    | -relZ       | -relY       |
-| UP     | EAST     | SOUTH   | relX        | relZ        |
-| DOWN   | EAST     | SOUTH   | relX        | -relZ       |
-
-Wait, let me re-examine UP and DOWN.
-
-For UP (floor, screen faces up):
-- Looking down at the screen from above
-- rightDir = EAST (X increases rightward)
-- downDir = SOUTH (Z increases downward on screen)
-- topLeft = go WEST (east.opposite = WEST) then go NORTH (south.opposite = NORTH)
-- topLeft is west-most (smallest X), north-most (smallest Z)
-- Rectangle extends EAST (increasing X) and SOUTH (increasing Z)
-
-relX = pos.x - topLeft.x (increasing eastward) → col = relX
-relZ = pos.z - topLeft.z (increasing southward) → row = relZ
-
-For DOWN (ceiling):
-- Looking up at the screen from below, the screen faces down
-- From below: right = EAST, "down" on screen = NORTH (from below, looking up, north is your foot direction if facing south)
-
-Hmm, actually for ceiling, this is confusing. Let me think about it differently.
-
-If the screen is on the ceiling, and the player stands under it looking up:
-- If the player faces north, then:
-  - East is to the right
-  - South is behind them
-  - The screen orientation: right = EAST, down = where their feet point = SOUTH
-  
-But from below, looking up, the "top" of the screen (furthest from the viewer) is... hmm.
-
-I think the simplest approach for DOWN is to match UP but inverted: rightDir = EAST, downDir = NORTH. Let's see:
-
-For DOWN: rightDir = EAST, downDir = NORTH
-- topLeft = go WEST, go SOUTH (north.opposite = SOUTH)
-- topLeft is west-most, south-most
-- Rectangle extends EAST and NORTH
-- relX = pos.x - topLeft.x → col = relX
-- relZ = pos.z - topLeft.z → row (increasing northward = decreasing Z)
-
-Wait, north is negative Z. So if downDir = NORTH (negative Z), then:
-- row 0 at south-most (largest Z), row 1 one step north (Z-1)
-- relZ = pos.z - topLeft.z where topLeft.z is largest Z (south-most)
-- For a block one step north: relZ = (topLeft.z - 1) - topLeft.z = -1
-- row = -relZ (to make it positive)
-
-Hmm, this is getting complex. Let me simplify.
-
-For DOWN facing, let's say downDir = SOUTH. Then:
-- topLeft = go WEST, go NORTH (south.opposite = NORTH)
-- topLeft is west-most, north-most
-- Rectangle extends EAST and SOUTH
-- This is the same as UP!
-- col = relX, row = relZ
-
-But will the UV appear upside-down to the player looking up from below? The player would see the texture... let me think.
-
-The screen texture is rendered on the downside of the block (facing DOWN). The texture has its origin at the top-left corner. When you look at it from below:
-- The UV origin (0,0) would be at... where the renderer puts it.
-
-The renderer for DOWN:
-Direction.DOWN -> {
-    for (v in vertices) { val ty = v.y; v.y = v.z; v.z = ty; v.y = 0.005f }
-    normal = Vector3f(0f, 1f, 0f)
-}
-
-This maps the face to the bottom of the block (y = 0.005f). The vertices go from 0,0 (which becomes y=0.005, z=0) to 1,1 (y=1.005, z=1). Wait, that doesn't look right. Let me trace through:
-
-Original vertices:
-v0 = (0, 0, 0.005)
-v1 = (1, 0, 0.005)
-v2 = (1, 1, 0.005)
-v3 = (0, 1, 0.005)
-
-For DOWN:
-- v0: ty = 0, v.y = 0.005 (z became y), v.z = 1 - 0 = 1 (ty = y), then v.y = 0.005. So v0 = (0, 0.005, 1)
-- v1: ty = 0, v.y = 0.005, v.z = 1 - 0 = 1, v.y = 0.005. v1 = (1, 0.005, 1)
-- v2: ty = 1, v.y = 0.005, v.z = 1 - 1 = 0, v.y = 0.005. v2 = (1, 0.005, 0)
-- v3: ty = 1, v.y = 0.005, v.z = 1 - 1 = 0, v.y = 0.005. v3 = (0, 0.005, 0)
-
-So for DOWN, the quad goes from (0, 0.005, 1) to (1, 0.005, 0), which is the bottom face. The UV goes from (uMin, vMax) at v0 = (0, 0.005, 1) to (uMin, vMin) at v3 = (0, 0.005, 0).
-
-Wait, let me re-check the addQuad function:
-addVertex(buffer, matrix, v0, uMin, vMax, n)  // (0, 0.005, 1) -> uMin, vMax
-addVertex(buffer, matrix, v1, uMax, vMax, n)  // (1, 0.005, 1) -> uMax, vMax
-addVertex(buffer, matrix, v2, uMax, vMin, n)  // (1, 0.005, 0) -> uMax, vMin
-addVertex(buffer, matrix, v3, uMin, vMin, n)  // (0, 0.005, 0) -> uMin, vMin
-
-So UV (0,0)/(uMin, vMin) is at position (0, 0.005, 0) = northwest corner
-UV (1,0)/(uMax, vMin) is at position (1, 0.005, 0) = northeast corner
-UV (0,1)/(uMin, vMax) is at position (0, 0.005, 1) = southwest corner
-UV (1,1)/(uMax, vMax) is at position (1, 0.005, 1) = southeast corner
-
-So on the bottom face:
-- u increases with X (east)
-- v increases with Z (south)
-
-From below, looking up at the ceiling:
-- East is to the RIGHT
-- South is... if looking north, south is behind you. So on the ceiling from below:
-  - X increases eastward = right ✓
-  - Z increases southward = away from you ✓
-
-So UV origin (u=0, v=0) is at the northwest-south corner? No, (u=0, v=0) is at (0, 0.005, 0) which is northwest of the block. From below looking up, northwest... if you face north, northwest is to your left and ahead. 
-
-From below looking up, if you face north:
-- East = right
-- South = behind you (upward on the screen from your perspective)
-- North = in front of you (downward on the screen)
-- West = left
-
-So:
-- u increases eastward = right on screen ✓
-- v increases southward = upward on screen ✓
-
-So if col = relX and row = relZ:
-- uMin = col/width → shifts right for blocks further east ✓
-- vMin = row/height → shifts up for blocks further south
-
-But wait, vMin in the quad is at (0, 0.005, 0) = northwest-south. And v increases with Z = south. So vMax is at Z=1 (south side of block). So the texture's v=0 is at the north side of the block and v=1 is at the south side.
-
-And row is calculated based on relZ... relZ = pos.z - topLeft.z. If topLeft is north-most (smallest Z), then:
-- Blocks with smaller Z (more north) have smaller relZ → smaller row → smaller v → closer to vMin which is at north side ✓
-
-I think for DOWN facing, using rightDir = EAST, downDir = SOUTH gives a consistent coordinate system. The player looking up from below would see the screen oriented correctly.
-
-But wait, there's a problem. The tryFormMonitor sets the PART and ACTIVE state for each block. The invalidateMonitor sets PART back to SINGLE. These are just decorative. The renderer doesn't use PART at all (it renders the browser texture for all blocks regardless of PART).
-
-OK let me now also check getMousePositionInMonitor in InputHandler to make sure the mouse coordinate calculations match.
-
-Current code for NORTH:
-Direction.NORTH -> {
-    browserX = (1f - dx) * blockPixelWidth + relX * blockPixelWidth
-    browserY = dy * blockPixelHeight + relY * blockPixelHeight
-}
-
-With the fixed directions (rightDir = EAST, downDir = DOWN):
-- relX = -wait, relX, relY, relZ are absolute: pos.x - topLeft.x, etc.
-- dx/dy/dz are the hit coordinates within the block face
-
-For NORTH facing, the screen face is the north face. Hit on north face:
-- dx = hit.x - pos.x (how far east from block origin)
-- dy = hit.y - pos.y (how far up from block origin)
-- dz = hit.z - pos.z (how far south from block origin)... for north face, dz = 0 (at the face)
-
-Wait, for NORTH facing, the north face is at z = pos.z. The hit is on z = pos.z, and dz = 0.
-- dx increases eastward = rightward on screen
-- dy increases upward
-
-So browserX = (1 - dx) * 120 + relX * 120:
-- At left edge of block: dx = 0, browserX = 120 + relX * 120 = (relX + 1) * 120
-  But if this is the left-most block (col 0), browserX should be 0, not (relX + 1) * 120!
-
-Wait, dx is 0 at the WEST edge of the block (x = pos.x), and 1 at the EAST edge (x = pos.x + 1). On the screen facing north:
-- West is LEFT on screen
-- East is RIGHT on screen
-- browserX should be 0 at the left edge and 120 at the right edge
-
-(1 - dx) * 120: at left edge (dx = 0), browserX = 120. At right edge (dx = 1), browserX = 0. So this gives values from 120 to 0, not 0 to 120!
-
-This looks inverted. But then relX * 120 is added:
-- For the left-most block (col 0, smallest X), relX = pos.x - topLeft.x. If topLeft is at X=5 and this block is also at X=5: relX = 0. Then browserX = (1 - dx) * 120 + 0 = 120 to 0.
-- For the next block east (col 1, X=6): relX = 1. browserX = (1 - dx) * 120 + 120 = 240 to 120.
-
-So browserX ranges from 120 (at left edge of left block) to 240 (at right edge of left block) for col 0. But it should be 0 to 120!
-
-I think the issue is that the code uses (1f - dx) which inverts the X axis. And relX * blockPixelWidth adds the column offset but with wrong alignment.
-
-Actually wait, for the browser's coordinate system:
-- browserX = 0 is the left edge of the entire monitor
-- browserX = width * 120 is the right edge
-
-For NORTH facing:
-- The left edge of the monitor is the WEST edge of the left-most block
-- At the WEST edge of left-most block: pos.x = topLeft.x, dx = 0
-- The code gives: browserX = (1 - 0) * 120 + 0 * 120 = 120
-- But it should be 0!
-
-So the code is off by one block. The formula should be:
-- browserX = dx * blockPixelWidth + relX * blockPixelWidth
-  (just dx, not 1-dx)
-
-Actually, (1 - dx) was probably intended because for NORTH facing, the UV on the north face has X reversed (east is left in UV space). But for mouse coordinates, west should be 0, east should be max. So 1 - dx is wrong here.
-
-Let me think about which directions the UV has:
-- For NORTH, the monitor_block_on.json model has the texture on the north face. Minecraft maps UV on the north face with u increasing EASTWARD and v increasing DOWNWARD.
-- But the custom renderer bypasses this entirely. renderScreenFace draws its own quad with custom UV mapping.
-
-For NORTH facing in renderScreenFace, the face is rendered with:
-Direction.NORTH -> {} // no transformation, default vertices (0,0,0.005) to (1,1,0.005)
-
-The default quad goes from (0,0,0.005) to (1,1,0.005):
-- v0 = (0, 0, 0.005) → uMin, vMax
-- v1 = (1, 0, 0.005) → uMax, vMax
-- v2 = (1, 1, 0.005) → uMax, vMin
-- v3 = (0, 1, 0.005) → uMin, vMin
-
-So u increases with X (eastward) and v increases with... let me check:
-- v0 has vMax (at Y=0)
-- v1 has vMax (at Y=0)
-- v2 has vMin (at Y=1)
-- v3 has vMin (at Y=1)
-
-So v decreases as Y increases (going up). Wait, that's inverted. vMax is at Y=0 (bottom) and vMin is at Y=1 (top). So the texture is flipped vertically in the renderer!
-
-Hmm, that might actually be intentional because the UV in the browser texture might have (0,0) at top-left. Let me check addQuad:
-
-addVertex(buffer, matrix, v0, uMin, vMax, n)  // (0, 0, 0.005) -> uMin, vMax
-addVertex(buffer, matrix, v1, uMax, vMax, n)  // (1, 0, 0.005) -> uMax, vMax
-addVertex(buffer, matrix, v2, uMax, vMin, n)  // (1, 1, 0.005) -> uMax, vMin
-addVertex(buffer, matrix, v3, uMin, vMin, n)  // (0, 1, 0.005) -> uMin, vMin
-
-The vertices go (0,0) -> (1,0) -> (1,1) -> (0,1), which is CCW (front face). v0 has v=vMax (bottom of texture), v3 has v=vMin (top of texture).
-
-So the top of the texture (vMin) is at Y=1 (top of block), and bottom (vMax) is at Y=0. That's correct.
-
-Now for mouse coordinates with NORTH:
-browserX = (1f - dx) * blockPixelWidth + relX * blockPixelWidth
-browserY = dy * blockPixelHeight + relY * blockPixelHeight
-
-browserY = dy * 120 + relY * 120:
-- dy = 0 at bottom of block (y = pos.y), dy = 1 at top (y = pos.y + 1)
-- But the "top" of the monitor (row 0) should be at the highest Y.
-- relY = pos.y - topLeft.y
-  - For top row (highest Y): relY = 0
-  - For next row down: relY = -1
-  
-So browserY for top row block, at the top of the block (dy = 1): 1 * 120 + 0 = 120
-For top row block, at the bottom of the block (dy ≈ 0): 0 * 120 + 0 = 0
-For second row block (relY = -1), at the top: 1 * 120 + (-1) * 120 = 0
-For second row block, at the bottom: 0 * 120 + (-1) * 120 = -120
-
-So the range overlaps! Top row gives 0 to 120, second row gives -120 to 0. But it should be 0-120 for top row, 120-240 for second row.
-
-The issue is that relY is negative (because top row has highest Y, lower rows have lower Y), so relY * 120 gives negative values.
-
-For the correct calculation with downDir = DOWN, top-left is at highest Y:
-- relY = pos.y - topLeft.y, which is 0 at top row, -1 at next row, etc.
-- browserY should be... at top row, 0 to 120. At second row, 120 to 240.
-- So: browserY = (1 - dy) * 120 + (-relY) * 120
-
-Wait, let me reconsider. dy = 0 at bottom of block, dy = 1 at top.
-- Top of block on top row (relY = 0): dy = 1, browserY = (-relY) * 120 + (1 - dy) * 120 = 0 + 0 = 0
-- Bottom of block on top row: dy = 0, browserY = 0 + 120 = 120
-- Top of block on second row (relY = -1): dy = 1, browserY = 120 + 0 = 120
-- Bottom of block on second row: dy = 0, browserY = 120 + 120 = 240
-
-That works! So the formula should be:
-browserY = (-relY) * blockPixelHeight + (1 - dy) * blockPixelHeight
-
-Or equivalently:
-browserY = (1 - dy - relY) * blockPixelHeight
-
-Wait, that's the same as:
-browserY = dy * blockPixelHeight + (-relY) * blockPixelHeight - dy * blockPixelHeight + (1-dy) * blockPixelHeight
-
-No, let me just write it cleanly:
-browserY = (-relY) * blockPixelHeight + (1f - dy) * blockPixelHeight
-
-Hmm, or better: let me reconsider the coordinate system.
-
-If we have:
-- topLeft at highest Y
-- row 0 at top (highest Y), row = -relY (since relY = pos.y - topLeft.y is 0 or negative)
-
-Then for a block at row r, with dy = 0 at bottom (y = pos.y), dy = 1 at top (y = pos.y + 1):
-- The top of the block = pos.y + 1
-- The bottom of the block = pos.y
-
-The absolute Y of the block:
-- Top row (r=0): pos.y = topLeft.y (highest)
-- Next row (r=1): pos.y = topLeft.y - 1
-
-browserY should be 0 at the top of the monitor and height*120 at the bottom.
-
-Top of monitor = top of top row = topLeft.y + 1
-At this point: browserY = 0
-
-Bottom of a block = pos.y
-For row 0: pos.y = topLeft.y
-browserY at bottom = 120
-
-So browserY = (topLeft.y + 1 - absolute_y) * 120
-= (topLeft.y + 1 - (pos.y + dy)) * 120
-= (topLeft.y + 1 - pos.y - dy) * 120
-= (-relY + 1 - dy) * 120
-
-Where relY = pos.y - topLeft.y.
-
-So browserY = (-relY + 1 - dy) * 120
-
-For top-left block (relY = 0), at top (dy = 1): browserY = (0 + 1 - 1) * 120 = 0 ✓
-For top-left block, at bottom (dy = 0): browserY = (0 + 1 - 0) * 120 = 120
-For second row block (relY = -1), at top (dy = 1): browserY = (1 + 1 - 1) * 120 = 120 ✓
-For second row block, at bottom (dy = 0): browserY = (1 + 1 - 0) * 120 = 240
-
-This works!
-
-For browserX with EAST rightDir:
-- dx = 0 at west edge, dx = 1 at east edge
-- Left of monitor = west-most = smallest X = topLeft.x
-- Right of monitor = east-most = largest X = topLeft.x + width - 1
-
-browserX should be 0 at left edge, width*120 at right edge.
-
-Absolute X of point = pos.x + dx (where dx is how far into the block from its west face)
-
-browserX = (absolute_X - topLeft.x) * 120
-= (pos.x + dx - topLeft.x) * 120
-= (relX + dx) * 120
-
-For left-most block (relX = 0), at west edge (dx = 0): browserX = 0 ✓
-For left-most block, at east edge (dx = 1): browserX = 120 ✓
-For right-most block (relX = width-1), at east edge (dx = 1): browserX = width * 120 ✓
-
-So browserX = (relX + dx) * 120
-
-This is for NORTH facing with rightDir=EAST. But the current code has browserX = (1f - dx) * blockPixelWidth + relX * blockPixelWidth, which is (1 - dx + relX) * 120 = (relX + 1 - dx) * 120. This gives browserX at left edge of left block (relX=0, dx=0) = 120, not 0.
-
-So the current code is wrong. It should be (relX + dx) * 120.
-
-But wait, I need to check if the current code actually works with the CURRENT (buggy) direction system. With the current code:
-- rightDir = EAST, downDir = UP for NORTH
-- topLeft at west-most, lowest Y (because it goes DOWN for "up")
-
-Actually, with downDir = UP:
-- findTopLeft goes in downDir.opposite = DOWN
-- So topLeft is at the LOWEST Y
-
-Wait, I'm confusing myself. Let me re-read findTopLeft with the CURRENT buggy code:
-
-while (true) {
-    val leftPos = pos.relative(rightDir.opposite)  // WEST
-    if (!isMonitorBlock(leftPos, level, facing)) break
-    pos = leftPos
-}
-while (true) {
-    val upPos = pos.relative(downDir.opposite)  // DOWN (since downDir=UP, opposite=DOWN)
-    if (!isMonitorBlock(upPos, level, facing)) break
-    pos = upPos
-}
-return pos
-
-So topLeft = west-most, lowest Y. This is the BOTTOM-LEFT corner, not top-left!
-
-Then measureWidth goes EAST, measureHeight goes UP (positive Y).
-
-So the rectangle extends UP from the bottom-left corner.
-
-In the renderer for NORTH:
-relX = entity.blockPos.x - shape.topLeft.x  
-relY = entity.blockPos.y - shape.topLeft.y
-
-For a block at the bottom-left corner: relX = 0, relY = 0
-For a block one row up: relX = 0, relY = 1
-
-For col:
-col = -relX  → col = 0, -1, -2 for relX = 0, 1, 2
-
-This is wrong. col should be 0, 1, 2 for blocks to the east.
-
-And row:
-row = relY  → row = 0, 1, 2 for relY = 0, 1, 2 (going up)
-
-This is also wrong if row should increase downward (which is the convention for UVs).
-
-For the browserX/Y:
-browserX = (1f - dx) * blockPixelWidth + relX * blockPixelWidth
-
-At left edge of bottom-left block: dx=0, relX=0 → browserX = 120. But left edge should be 0!
-
-Hmm OK, the current code is just all around wrong. No wonder it doesn't work.
-
-Let me fix everything systematically:
-
-Fix 1: MonitorBlock placement facing
-val facing = context.clickedFace
-
-Fix 2: getPerpendicularDirections
-Direction.NORTH -> Pair(Direction.EAST, Direction.DOWN)
-Direction.SOUTH -> Pair(Direction.WEST, Direction.DOWN)
-Direction.EAST -> Pair(Direction.SOUTH, Direction.DOWN)
-Direction.WEST -> Pair(Direction.NORTH, Direction.DOWN)
-Direction.UP -> Pair(Direction.EAST, Direction.SOUTH)
-Direction.DOWN -> Pair(Direction.EAST, Direction.SOUTH)
-
-Fix 3: Renderer col/row calculation
-With rightDir = EAST/WEST/SOUTH/NORTH and downDir = DOWN:
-- col = relX for EAST rightDir, col = -relX for WEST rightDir
-- col = relZ for SOUTH rightDir, col = -relZ for NORTH rightDir
-- row = -relY (because downDir = DOWN, so Y decreases as row increases)
-
-Wait, I need to generalize. For each facing, I need the col and row formulas based on rightDir and downDir:
-
-For NORTH: rightDir = EAST, downDir = DOWN
-- col = relX (east increases col → right on screen) 
-- row = -relY (Y decreases as we go down)
-
-For SOUTH: rightDir = WEST, downDir = DOWN
-- col = -relX (west increases col → right on screen, so east decreases col)
-- row = -relY
-
-For EAST: rightDir = SOUTH, downDir = DOWN
-- col = relZ (south increases col → right on screen)
-- row = -relY
-
-For WEST: rightDir = NORTH, downDir = DOWN
-- col = -relZ (north increases col → right on screen, so south decreases col)
-- row = -relY
-
-For UP: rightDir = EAST, downDir = SOUTH
-- col = relX (east increases col)
-- row = relZ (south increases row going down on screen from above)
-
-For DOWN: rightDir = EAST, downDir = SOUTH
-- col = relX 
-- row = -relZ (from below, north is up on screen... hmm)
-
-Actually wait. Let me reconsider UP and DOWN more carefully.
-
-For UP (floor, screen faces up):
-- Looking from above: right = EAST, down = SOUTH
-- topLeft = go WEST, go NORTH → (west-most, north-most)
-- Rectangle extends EAST (right) and SOUTH (down)
-
-Block at (topLeft.x + col, y, topLeft.z + row) where col=0..width-1, row=0..height-1
-- relX = col, relZ = row
-- col = relX ✓
-- row = relZ ✓
-
-For DOWN (ceiling, screen faces down):
-- Looking from below: right = EAST, down = SOUTH  
-- topLeft = go WEST, go NORTH → (west-most, north-most)
-- Rectangle extends EAST and SOUTH
-- From below looking up: east is to the right, and south is... let me think.
-  
-  If you're standing at the north end looking south:
-  - East is to your right ✓
-  - South is in front of you = "down" on the screen
-  - So row should increase southward: row = relZ
-
-  But wait, from below looking up at the ceiling, the texture is on the bottom face of the block. The renderer maps v increasing with Z (south). The player sees:
-  - u increasing eastward = right ✓
-  - v increasing southward = downward on screen ✓
-
-  So for DOWN: col = relX, row = relZ
-
-Actually, now I realize there's a problem. The renderer for DOWN uses:
-Direction.DOWN -> {
-    for (v in vertices) { val ty = v.y; v.y = v.z; v.z = ty; v.y = 0.005f }
-    normal = Vector3f(0f, 1f, 0f)
-}
-
-This maps the quad to the bottom face (y = 0.005). Z becomes Y and Y becomes Z. But looking from below, the quad's vMin is at Z=0 (north side) and vMax at Z=1 (south side). So v increases southward, which from the player's perspective looking south from the north, v increases "downward" (away from the player). That's correct!
-
-But wait, vMin is at the vertex (0, 0.005, 0) and vMax is at (0, 0.005, 1):
-- v0 = (0, 0.005, 1) → uMin, vMax (Z=1, south)
-- v3 = (0, 0.005, 0) → uMin, vMin (Z=0, north)
-
-So vMin at Z=0 (north) and vMax at Z=1 (south). The texture "top" (v=0/vMin) is at the north side.
-
-For the player looking up from below:
-- North is away from them if they face north
-- South is behind them if they face north
-
-Hmm, this is getting complicated. Let me just pick consistent conventions and go with it.
-
-For DOWN: col = relX, row = relZ.
-
-Fix 4: InputHandler browserX/browserY formulas
-
-Let me use the general formula:
-- browserX = (relDir_right + hitPos_right) * blockPixelWidth
-  Where relDir_right is the number of blocks to the right from topLeft
-  And hitPos_right is the fractional position within the block along the right axis
-
-- browserY = (relDir_down + hitPos_down) * blockPixelHeight
-  Where relDir_down is the number of blocks down from topLeft
-  And hitPos_down is the fractional position within the block along the down axis
-
-For NORTH: rightDir = EAST, downDir = DOWN
-- relRight = relX, hitRight = dx
-- relDown = -relY, hitDown = dy (actually need to think about dy direction)
-
-Wait, for downDir = DOWN:
-- "down" = negative Y
-- relDown from topLeft = topLeft.y - pos.y = -relY (positive number going down)
-- hitDown from within block = dy (0 at bottom of block = pos.y, 1 at top = pos.y + 1)
-
-But browserY should be 0 at top of monitor and increase going down.
-
-At absolute Y position of (pos.y + dy):
-- Distance from top of monitor (topLeft.y + 1): 
-  browserY = (topLeft.y + 1) - (pos.y + dy) = (-relY + 1 - dy) * 120
-
-So browserY = (-relY + 1 - dy) * blockPixelHeight
-
-Hmm, let me unify:
-- relRight along rightDir: number of steps from topLeft in the right direction
-- hitRight: 0 to 1 within the block along the right axis
-- relDown along downDir: number of steps from topLeft in the down direction
-- hitDown: 0 to 1 within the block along the down axis
-
-For EAST rightDir: right = +X axis
-- dx from hit goes from 0 (min X of block) to 1 (max X of block)
-- This maps directly to the "how far right in the block" coordinate
-- So hitRight = dx
-
-For DOWN downDir: down = -Y axis  
-- dy from hit goes from 0 (min Y = block bottom) to 1 (max Y = block top)
-- But "down" means going from top to bottom, so at the bottom of the block, dy = 0
-- At the top of the block (closest to topLeft), dy = 1
-- So hitDown should be 1 - dy (at dy=1, hitDown=0 at top; at dy=0, hitDown=1 at bottom)
-
-Then browserY = (relDown + hitDown) * 120
-  = ((-relY) + (1 - dy)) * 120
-  = (-relY + 1 - dy) * 120
-
-This matches what I derived above! 
-
-But actually, I think it's simpler to just compute it directionally:
-
-browserX = (offsetInDir(rightDir) + fracInDir(rightDir)) * 120
-browserY = (offsetInDir(downDir) + fracInDir(downDir)) * 120
-
-Where:
-offsetInDir(dir) = how many blocks from topLeft along dir direction
-fracInDir(dir) = how far (0-1) within the block along dir
-
-For example:
-- rightDir = EAST: offsetInDir = relX, fracInDir = dx
-- downDir = DOWN: offsetInDir = -relY (since moving in DOWN = -Y), fracInDir = 1 - dy (since DOWN is decreasing Y, and dy measures from bottom of block)
-
-Wait, this is getting messy. Let me just compute browserX and browserY using the same coordinate system as col/row but with the fractional position.
-
-I think the cleanest approach is:
-
-For the browser coordinate:
-- browserX = (col + withinBlockX) * blockPixelWidth
-- browserY = (row + withinBlockY) * blockPixelHeight
-
-Where withinBlockX is 0 to 1 from left to right within the block, and withinBlockY is 0 to 1 from top to bottom within the block.
-
-Now for each facing, calculate col, row, withinBlockX, withinBlockY from the hit:
-
-| Facing | rightDir | downDir | col | row | withinBlockX | withinBlockY |
-|--------|----------|---------|-----|-----|-------------|-------------|
-| NORTH  | EAST     | DOWN    | relX | -relY | dx | 1-dy |
-| SOUTH  | WEST     | DOWN    | -relX | -relY | 1-dx | 1-dy |
-| EAST   | SOUTH    | DOWN    | relZ | -relY | dz | 1-dy |
-| WEST   | NORTH    | DOWN    | -relZ | -relY | 1-dz | 1-dy |
-| UP     | EAST     | SOUTH   | relX | relZ | dx | dz |
-| DOWN   | EAST     | SOUTH   | relX | -relZ? or relZ? | dx | 1-dz? or dz? |
-
-For UP and DOWN, it depends on the renderer's UV mapping.
-
-For UP (renderer):
-The quad on the top face:
-- v0 = (0, 1-0.005, 1) → uMin, vMax (X=0, Z=1) → y = 1-0.005
-- v1 = (1, 1-0.005, 1) → uMax, vMax (X=1, Z=1)
-- v2 = (1, 1-0.005, 0) → uMax, vMin (X=1, Z=0)
-- v3 = (0, 1-0.005, 0) → uMin, vMin (X=0, Z=0)
-
-So u increases with X, v increases... vMax at Z=1, vMin at Z=0. So v increases with Z (south).
-
-The UV mapping on the top face:
-- uMin at X=0 (west), uMax at X=1 (east) ✓ browserX = dx
-- vMin at Z=0 (north), vMax at Z=1 (south) ✓ browserY = dz
-
-But the player looking at the top face from above:
-- X increases eastward = right → browserX = dx ✓
-- Z increases southward → from above, south is "down" on the screen if the player faces south. But it could be "up" if they face north!
-
-The issue is that the browser's screen coordinate system is fixed: X increases right, Y increases down. But the world's coordinate system on a UP/DOWN facing monitor depends on the player's orientation.
-
-Actually, this is a problem with any upward/downward facing screen. The concept of "right" and "down" are ambiguous because the monitor is horizontal. The current code assumes right = EAST, down = SOUTH for UP. This is a reasonable convention.
-
-For the renderer: browserY = row + withinBlockY where:
-- row = relZ (number of blocks south from north edge)
-- withinBlockY = dz (0 to 1 from north to south)
-
-So browserY = (relZ + dz) * 120 ✓
-
-For DOWN (renderer):
-The quad on the bottom face:
-- v0 = (0, 0.005, 1) → uMin, vMax
-- v1 = (1, 0.005, 1) → uMax, vMax  
-- v2 = (1, 0.005, 0) → uMax, vMin
-- v3 = (0, 0.005, 0) → uMin, vMin
-
-Same UV mapping: u increases with X, v increases with Z.
-
-From below looking up:
-- u increases eastward = right ✓
-- v increases southward = "down" on the screen ✓ (if the player faces south, south is toward their feet)
-
-So for DOWN:
-- col = relX, withinBlockX = dx
-- row = relZ, withinBlockY = dz
-- browserX = (relX + dx) * 120
-- browserY = (relZ + dz) * 120
-
-OK, let me now write the complete fix. I need to:
-
-1. Fix MonitorBlock.getStateForPlacement 
-2. Fix getPerpendicularDirections
-3. Fix renderer col/row calculation
-4. Fix InputHandler browserX/browserY calculation
-5. Add debug logging
-
-Let me also add debug logging to make it easier to diagnose issues.
-
-Actually, now that I think about it, the renderer's col/row and the InputHandler's browserX/browserY use the same coordinate system. So I should make sure they're consistent.
-
-The renderer uses:
-val uMin = col.toFloat() / shape.width
-val uMax = (col + 1).toFloat() / shape.width
-val vMin = row.toFloat() / shape.height
-val vMax = (row + 1).toFloat() / shape.height
-
-And the UV mapping on the face:
-- u increases with the "right" direction → col should increase rightward
-- v increases with the "down" direction → row should increase downward
-
-For NORTH facing (rightDir=EAST, downDir=DOWN):
-- relX increases eastward → col = relX ✓
-- relY... hmm, relY = pos.y - topLeft.y. If topLeft is the highest Y, then relY = 0 at top, -1 at next row, etc.
-- But row should be 0 at top, 1 at next row, etc.
-- So row = -relY ✓
-
-OK, I think my analysis is correct. Let me write the fix code now.
-
-Let me also check if there's a monitor_block.json in the models that I might need to fix. I already read it - it just extends monitor_block_off.
-
-Now let me implement all fixes.
-I see several bugs. Let me trace through the code systematically.
-Bug 1: MonitorBlock.getStateForPlacement uses nearestLookingDirection.opposite — should be clickedFace.
-Bug 2: getPerpendicularDirections has wrong directions — downDir should be DOWN for horizontal facings, and rightDir is wrong for SOUTH.
-Bug 3: Renderer col/row and InputHandler formulas are inconsistent with the shape detector.
-Let me fix all of them:
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlock.kt
-    builder.add(FACING, PART, ACTIVE)    builder.add(FACING, PART, ACTIVE)
-}}
-
-override fun getStateForPlacement(context: BlockPlaceContext): BlockState {override fun getStateForPlacement(context: BlockPlaceContext): BlockState {
-    val facing = context.nearestLookingDirection.opposite    val facing = context.clickedFace
-    return defaultBlockState().setValue(FACING, facing)    return defaultBlockState().setValue(FACING, facing)
-}}
-
-override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity? {override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity? {
-Thought: 457ms
-Now fix getPerpendicularDirections.
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\logic\MonitorShapeDetector.kt
-    }    }
-
-    private fun getPerpendicularDirections(facing: Direction): Pair<Direction, Direction>? {    private fun getPerpendicularDirections(facing: Direction): Pair<Direction, Direction>? {
-        return when (facing) {        return when (facing) {
-            Direction.NORTH, Direction.SOUTH -> Pair(Direction.EAST, Direction.UP)            Direction.NORTH -> Pair(Direction.EAST, Direction.DOWN)
-            Direction.EAST, Direction.WEST -> Pair(Direction.NORTH, Direction.UP)
-            Direction.UP, Direction.DOWN -> Pair(Direction.NORTH, Direction.EAST)            Direction.SOUTH -> Pair(Direction.WEST, Direction.DOWN)
-
-            Direction.EAST -> Pair(Direction.SOUTH, Direction.DOWN)
-
-        }            Direction.WEST -> Pair(Direction.NORTH, Direction.DOWN)
-    }            Direction.UP -> Pair(Direction.EAST, Direction.SOUTH)
-}            Direction.DOWN -> Pair(Direction.EAST, Direction.SOUTH)
-        }
-    }
-}
-Thought: 640ms
-Now fix the renderer's col/row calculation. The current code uses wrong formulas. Let me rewrite it to use the same rightDir/downDir convention as the shape detector.
-Now fix the renderer col/row to match the corrected directions:
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\renderer\MonitorBlockEntityRenderer.kt
-
-val col: Intval col: Int
-val row: Intval row: Int
-when (facing) {when (facing) {
-    Direction.NORTH -> { col = -relX; row = relY }    Direction.NORTH -> { col = relX; row = -relY }
-    Direction.SOUTH -> { col = relX; row = relY }    Direction.SOUTH -> { col = -relX; row = -relY }
-    Direction.EAST -> { col = relZ; row = relY }    Direction.EAST -> { col = relZ; row = -relY }
-    Direction.WEST -> { col = -relZ; row = relY }    Direction.WEST -> { col = -relZ; row = -relY }
-    Direction.UP -> { col = relX; row = -relZ }    Direction.UP -> { col = relX; row = relZ }
-    Direction.DOWN -> { col = relX; row = relZ }    Direction.DOWN -> { col = relX; row = relZ }
-    else -> return    else -> return
-}}
-
-Thought: 510ms
-Now fix the InputHandler's getMousePositionInMonitor to use the corrected coordinate system. The current formulas are wrong. Let me rewrite them.
-Now fix the input handler's mouse position calculation:
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\input\InputHandler.kt
-val browserX: Doubleval browserX: Double
-val browserY: Doubleval browserY: Double
-when (facing) {when (facing) {
-    Direction.NORTH -> {    Direction.NORTH -> {
-        browserX = (1f - dx) * blockPixelWidth + relX * blockPixelWidth        browserX = (relX + dx) * blockPixelWidth
-        browserY = dy * blockPixelHeight + relY * blockPixelHeight        browserY = (-relY + 1.0 - dy) * blockPixelHeight
-    }    }
-    Direction.SOUTH -> {    Direction.SOUTH -> {
-        browserX = dx * blockPixelWidth + relX * blockPixelWidth        browserX = (-relX + 1.0 - dx) * blockPixelWidth
-        browserY = dy * blockPixelHeight + relY * blockPixelHeight        browserY = (-relY + 1.0 - dy) * blockPixelHeight
-    }    }
-    Direction.EAST -> {    Direction.EAST -> {
-        browserX = dz * blockPixelWidth + relZ * blockPixelWidth        browserX = (relZ + dz) * blockPixelWidth
-        browserY = dy * blockPixelHeight + relY * blockPixelHeight        browserY = (-relY + 1.0 - dy) * blockPixelHeight
-    }    }
-    Direction.WEST -> {    Direction.WEST -> {
-        browserX = (1f - dz) * blockPixelWidth + (-relZ) * blockPixelWidth        browserX = (-relZ + 1.0 - dz) * blockPixelWidth
-        browserY = dy * blockPixelHeight + relY * blockPixelHeight
-    }        browserY = (-relY + 1.0 - dy) * blockPixelHeight
-    Direction.UP -> {    }
-        browserX = dx * blockPixelWidth + relX * blockPixelWidth    Direction.UP -> {
-        browserY = (1f - dz) * blockPixelHeight + (-relZ) * blockPixelHeight        browserX = (relX + dx) * blockPixelWidth
-    }        browserY = (relZ + dz) * blockPixelHeight
-    Direction.DOWN -> {
-        browserX = dx * blockPixelWidth + relX * blockPixelWidth    }
-        browserY = dz * blockPixelHeight + relZ * blockPixelHeight    Direction.DOWN -> {
-    }        browserX = (relX + dx) * blockPixelWidth
-}        browserY = (relZ + dz) * blockPixelHeight
-    }
-return Pair(}
-
-return Pair(
-Thought: 1.4s
-Now I need to add debug logging everywhere to help diagnose issues. Let me add logging to:
-1. MonitorBlock - placement, onPlace, useWithoutItem
-2. MonitorShapeDetector - findRectangle calls
-3. MonitorBlockEntity - tryFormMonitor, invalidateMonitor
-4. InputHandler - activate, deactivate, mouse position
-5. ClientBrowserCache - put, get, remove
-6. Renderer - render calls
-
-Let me add comprehensive logging.
-# Todos
-[✓] Check client logs for errors
-[✓] Review MonitorBlock placement facing logic
-[✓] Review rectangle detection (MonitorShapeDetector)
-[✓] Review browser creation/activation (ClientBrowserCache, InputHandler)
-[•] Add debug logging throughout
-[ ] Rebuild and test
-Thought: 357ms
-Now let me add debug logging. I'll add it strategically to key files.
-Now add debug logging throughout. Let me update each file:
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlock.kt
-import net.minecraft.world.level.block.state.properties.BooleanPropertyimport net.minecraft.world.level.block.state.properties.BooleanProperty
-import net.minecraft.world.level.block.state.properties.DirectionPropertyimport net.minecraft.world.level.block.state.properties.DirectionProperty
-import net.minecraft.world.level.block.state.properties.EnumPropertyimport net.minecraft.world.level.block.state.properties.EnumProperty
-import net.minecraft.world.phys.BlockHitResultimport net.minecraft.world.phys.BlockHitResult
-import org.slf4j.Logger
-
-class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
-
-    companion object {    companion object {
-Thought: 762ms
-Actually, let me add a companion object logger pattern. Let me add the logger to the companion object.
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlock.kt
-
-class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
-
-    companion object {    companion object {
-        private val LOGGER: Logger = com.mojang.logging.LogUtils.getLogger()
-        val FACING: DirectionProperty = DirectionProperty.create("facing")
-        val FACING: DirectionProperty = DirectionProperty.create("facing")        val PART: EnumProperty<MonitorPart> = EnumProperty.create("part", MonitorPart::class.java)
-        val PART: EnumProperty<MonitorPart> = EnumProperty.create("part", MonitorPart::class.java)        val ACTIVE: BooleanProperty = BooleanProperty.create("active")
-        val ACTIVE: BooleanProperty = BooleanProperty.create("active")
-
-Thought: 680ms
-Now add debug logging to the key functions in MonitorBlock.
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlock.kt
-}}
-
-override fun getStateForPlacement(context: BlockPlaceContext): BlockState {override fun getStateForPlacement(context: BlockPlaceContext): BlockState {
-    val facing = context.clickedFace
-    val facing = context.clickedFace    LOGGER.debug("[MonitorBlock] getStateForPlacement at {} facing={}", context.clickedPos, facing)
-    return defaultBlockState().setValue(FACING, facing)
-}
-    return defaultBlockState().setValue(FACING, facing)
-}override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity? {
-
-override fun newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity? {
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlock.kt
-    return BlockEntityRegistry.MONITOR_BLOCK_ENTITY.get().create(pos, state)    return BlockEntityRegistry.MONITOR_BLOCK_ENTITY.get().create(pos, state)
-}
-}
-override fun onPlace(state: BlockState, level: Level, pos: BlockPos, oldState: BlockState, movedByPiston: Boolean) {
-override fun onPlace(state: BlockState, level: Level, pos: BlockPos, oldState: BlockState, movedByPiston: Boolean) {    LOGGER.debug("[MonitorBlock] onPlace at {} facing={} active={}", pos, state.getValue(FACING), state.getValue(ACTIVE))
-    if (state.block !== oldState.block) {
-        val be = level.getBlockEntity(pos)
-    if (state.block !== oldState.block) {        if (be is MonitorBlockEntity) be.tryFormMonitor()
-        val be = level.getBlockEntity(pos)    }
-        if (be is MonitorBlockEntity) be.tryFormMonitor()
-    }
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlock.kt
-    return InteractionResult.PASS    return InteractionResult.PASS
-}}
-
-override fun onRemove(state: BlockState, level: Level, pos: BlockPos, newState: BlockState, movedByPiston: Boolean) {override fun onRemove(state: BlockState, level: Level, pos: BlockPos, newState: BlockState, movedByPiston: Boolean) {
-    LOGGER.debug("[MonitorBlock] onRemove at {} active={}", pos, state.getValue(ACTIVE))
-    if (state.block !== newState.block) {
-    if (state.block !== newState.block) {        val be = level.getBlockEntity(pos)
-        val be = level.getBlockEntity(pos)        if (be is MonitorBlockEntity) be.invalidateMonitor()
-        if (be is MonitorBlockEntity) be.invalidateMonitor()    }
-    }
-Thought: 341ms
-Now add debug logging to MonitorShapeDetector.
-Now add logging to MonitorShapeDetector:
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\logic\MonitorShapeDetector.kt
-import net.minecraft.core.BlockPosimport net.minecraft.core.BlockPos
-import net.minecraft.core.Directionimport net.minecraft.core.Direction
-import net.minecraft.world.level.Levelimport net.minecraft.world.level.Level
-import net.minecraft.world.level.block.state.BlockStateimport net.minecraft.world.level.block.state.BlockState
-import org.slf4j.Logger
-
-data class MonitorShape(data class MonitorShape(
-    val topLeft: BlockPos,    val topLeft: BlockPos,
-    val width: Int,    val width: Int,
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\logic\MonitorShapeDetector.kt
-    val downDir: Direction    val downDir: Direction
-))
-
-object MonitorShapeDetector {object MonitorShapeDetector {
-    private val LOGGER: Logger = com.mojang.logging.LogUtils.getLogger()
-
-    private const val MIN_SIZE = 2    private const val MIN_SIZE = 2
-    private const val MAX_WIDTH = 48    private const val MAX_WIDTH = 48
-    private const val MAX_HEIGHT = 27    private const val MAX_HEIGHT = 27
-
-    fun findRectangle(origin: BlockPos, level: Level): MonitorShape? {    fun findRectangle(origin: BlockPos, level: Level): MonitorShape? {
-        val originState = level.getBlockState(origin)        val originState = level.getBlockState(origin)
-        if (originState.block !is MonitorBlock) return null        if (originState.block !is MonitorBlock) {
-            LOGGER.debug("[ShapeDetector] findRectangle at {} — not a MonitorBlock", origin)
-            return null
-        }
-
-        val facing = originState.getValue(MonitorBlock.FACING)
-        val facing = originState.getValue(MonitorBlock.FACING)        val (rightDir, downDir) = getPerpendicularDirections(facing) ?: return null
-        val (rightDir, downDir) = getPerpendicularDirections(facing) ?: return null
-
-        val width = measureWidth(topLeft, level, rightDir, facing)
-        val width = measureWidth(topLeft, level, rightDir, facing)        val height = measureHeight(topLeft, level, downDir, facing)
-        val height = measureHeight(topLeft, level, downDir, facing)
-        LOGGER.debug("[ShapeDetector] topLeft={} facing={} right={} down={} {}x{}", topLeft, facing, rightDir, downDir, width, height)
-        if (width < MIN_SIZE || height < MIN_SIZE) return null
-
-        if (width > MAX_WIDTH || height > MAX_HEIGHT) return null        if (width < MIN_SIZE || height < MIN_SIZE) {
-
-        if (!isRectangleFilled(topLeft, width, height, level, rightDir, downDir, facing)) return null            LOGGER.debug("[ShapeDetector] too small (min {}x{})", MIN_SIZE, MIN_SIZE)
-            return null
-        }
-        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-            LOGGER.debug("[ShapeDetector] too large (max {}x{})", MAX_WIDTH, MAX_HEIGHT)
-            return null
-        }
-
-        if (!isRectangleFilled(topLeft, width, height, level, rightDir, downDir, facing)) {
-            LOGGER.debug("[ShapeDetector] rectangle not fully filled")
-            return null
-        if (hasBlocksOutside(topLeft, width, height, level, rightDir, downDir, facing)) return null        }
-
-        if (hasBlocksOutside(topLeft, width, height, level, rightDir, downDir, facing)) {
-            LOGGER.debug("[ShapeDetector] blocks found outside rectangle")
-            return null
-        }
-
-        LOGGER.debug("[ShapeDetector] SUCCESS: {}x{} monitor from {}", width, height, topLeft)
-        return MonitorShape(topLeft, width, height, facing, rightDir, downDir)
-    }
-
-    private fun findTopLeft(origin: BlockPos, level: Level, rightDir: Direction, downDir: Direction, facing: Direction): BlockPos? {
-
-        return MonitorShape(topLeft, width, height, facing, rightDir, downDir)
-    }
-
-    private fun findTopLeft(origin: BlockPos, level: Level, rightDir: Direction, downDir: Direction, facing: Direction): BlockPos? {
-Thought: 338ms
-Now add debug logging to MonitorBlockEntity.
-Now add logging to MonitorBlockEntity:
+[•] Add audioMode and volume fields to MonitorBlockEntity with NBT persistence
+[ ] Create MonitorAudioPacket for server sync
+[ ] Register MonitorAudioPacket in Network.kt
+[ ] Add audio mode button + volume field to BrowserScreen GUI
+[ ] Update PLANO_CORRECOES.md with audio fields
+[ ] Build and verify compilation
+Thought: 439ms
+Let me add the audio fields to MonitorBlockEntity first.
 ← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlockEntity.kt
-import net.minecraft.world.level.block.state.BlockStateimport net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.phys.BlockHitResultimport net.minecraft.world.phys.BlockHitResult
+var width: Int = 1var width: Int = 1
+var height: Int = 1var height: Int = 1
+var currentUrl: String = "https://www.google.com"var currentUrl: String = "https://www.google.com"
+var pixelsPerBlock: Int = 120var pixelsPerBlock: Int = 120
+var audioMode: Int = 0 // 0=player, 1=center_block
+var volume: Int = 100 // 0-100
+var isActive: Boolean = falsevar isActive: Boolean = false
+var masterPos: BlockPos = blockPosvar masterPos: BlockPos = blockPos
+var shape: MonitorShape? = nullvar shape: MonitorShape? = null
 
-class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEntityRegistry.MONITOR_BLOCK_ENTITY.get(), pos, state) {class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEntityRegistry.MONITOR_BLOCK_ENTITY.get(), pos, state) {
-    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
-
-    var width: Int = 1
-    var width: Int = 1    var height: Int = 1
-    var height: Int = 1    var currentUrl: String = "https://www.google.com"
-    var currentUrl: String = "https://www.google.com"
+Thought: 444ms
+Now update saveAdditional and loadAdditional to persist these fields:
 ← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlockEntity.kt
+    tag.putInt("width", width)    tag.putInt("width", width)
+    tag.putInt("height", height)    tag.putInt("height", height)
+    tag.putString("url", currentUrl)    tag.putString("url", currentUrl)
+    tag.putInt("pixelsPerBlock", pixelsPerBlock)    tag.putInt("pixelsPerBlock", pixelsPerBlock)
+    tag.putInt("audioMode", audioMode)
+    tag.putInt("volume", volume)
+    tag.putBoolean("active", isActive)    tag.putBoolean("active", isActive)
+    tag.putLong("master_pos", masterPos.asLong())    tag.putLong("master_pos", masterPos.asLong())
 }}
 
-fun tryFormMonitor() {fun tryFormMonitor() {
-    val level = level ?: return    val level = level ?: return
-    val detected = MonitorShapeDetector.findRectangle(blockPos, level) ?: return    val detected = MonitorShapeDetector.findRectangle(blockPos, level)
+Thought: 376ms
+Now update loadAdditional to read them:
+← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\block\MonitorBlockEntity.kt
+    width = tag.getInt("width")    width = tag.getInt("width")
+    height = tag.getInt("height")    height = tag.getInt("height")
+    currentUrl = tag.getString("url")    currentUrl = tag.getString("url")
+    if (tag.contains("pixelsPerBlock")) pixelsPerBlock = tag.getInt("pixelsPerBlock")    if (tag.contains("pixelsPerBlock")) pixelsPerBlock = tag.getInt("pixelsPerBlock")
+    if (tag.contains("audioMode")) audioMode = tag.getInt("audioMode")
+    if (tag.contains("volume")) volume = tag.getInt("volume")
+    isActive = tag.getBoolean("active")    isActive = tag.getBoolean("active")
+    if (tag.contains("master_pos")) masterPos = BlockPos.of(tag.getLong("master_pos"))    if (tag.contains("master_pos")) masterPos = BlockPos.of(tag.getLong("master_pos"))
+    recalculateClientShape()    recalculateClientShape()
+}}
+"Skip to main content
+NeoForged Logo
+Homepage
+NeoForge Documentation
+Toolchain Features
+Primers
+User Guide
+Modpack Development
+26.1
+Contributing
+GitHub
 
-    LOGGER.debug("[BE] tryFormMonitor at {} detected={}", blockPos, detected)
-    if (detected == null) return
-    val facing = detected.facing    val facing = detected.facing
-    val rightDir = detected.rightDir    val rightDir = detected.rightDir
-    val downDir = detected.downDir    val downDir = detected.downDir
+Getting Started
 
-                be.setChanged()                be.setChanged()
-            }            }
-        }        }
-    }    }
-    LOGGER.debug("[BE] tryFormMonitor SUCCESS: {}x{} active at {}", width, height, masterPos)
-    setChanged()
-    setChanged()}
+Concepts
+Blocks
+
+Items
+
+Entities
+
+Block Entities
+
+Resources
+
+Client
+I18n and L10n
+Models
+
+Particles
+Sounds
+Textures
+Server
+Inventories & Transfers
+Data Storage
+Worldgen
+Networking
+
+Rendering
+Advanced Topics
+Miscellaneous
+ResourcesClientSounds
+Version: 26.1
+Sounds
+Sounds, while not required for anything, can make a mod feel much more nuanced and alive. Minecraft offers you various ways to register and play sounds, which will be laid out in this article.
+
+Terminology
+The Minecraft sound engine uses a variety of terms to refer to different things:
+
+Sound event: A sound event is an in-code trigger that tells the sound engine to play a certain sound. SoundEvents are also the things you register to the game.
+Sound category or sound source: Sound categories are rough groupings of sounds that can be individually toggled. The sliders in the sound options GUI represent these categories: master, block, player etc. In code, they can be found in the SoundSource enum.
+Sound definition: A mapping of a sound event to one or multiple sound objects, plus some optional metadata. Sound definitions are located in a namespace's sounds.json file.
+Sound object: A JSON object consisting of a sound file location, plus some optional metadata.
+Sound file: An on-disk sound file. Minecraft only supports .ogg sound files.
+danger
+Due to the implementation of OpenAL (Minecraft's audio library), for your sound to have attenuation - that is, for it to get quieter and louder depending on the player's distance to it -, your sound file must be mono (single channel). Stereo (multichannel) sound files will not be subject to attenuation and always play at the player's location, making them ideal for ambient sounds and background music. See also MC-146721.
+
+Creating SoundEvents
+SoundEvents are registered objects, meaning that they must be registered to the game through a DeferredRegister and be singletons:
+
+public class MySoundsClass {
+    // Assuming that your mod id is examplemod
+    public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
+            DeferredRegister.create(BuiltInRegistries.SOUND_EVENT, "examplemod");
+    
+    // All vanilla sounds use variable range events.
+    public static final Holder<SoundEvent> MY_SOUND = SOUND_EVENTS.register(
+            "my_sound",
+            // Takes in the registry name
+            SoundEvent::createVariableRangeEvent
+    );
+    
+    // There is a currently unused method to register fixed range (= non-attenuating) events as well:
+    public static final Holder<SoundEvent> MY_FIXED_SOUND = SOUND_EVENTS.register(
+            "my_fixed_sound",
+            // 16 is the default range of sounds. Be aware that due to OpenAL limitations,
+            // values above 16 have no effect and will be capped to 16.
+            registryName -> SoundEvent.createFixedRangeEvent(registryName, 16f)
+    );
 }
-override fun saveAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {
-override fun saveAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {
-Thought: 285ms
-Now add logging to ClientBrowserCache and InputHandler.
-Now add logging to ClientBrowserCache and InputHandler:
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\ClientBrowserCache.kt
-import net.minecraft.core.BlockPosimport net.minecraft.core.BlockPos
 
-object ClientBrowserCache {object ClientBrowserCache {
-    private val browsers = mutableMapOf<BlockPos, MCEFBrowser>()    private val browsers = mutableMapOf<BlockPos, MCEFBrowser>()
-    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
+Of course, don't forget to add your registry to the mod event bus in the mod constructor:
 
-    fun get(pos: BlockPos): MCEFBrowser? {
-    fun get(pos: BlockPos): MCEFBrowser? = browsers[pos]        val b = browsers[pos]
-        LOGGER.debug("[BrowserCache] get({}) = {}", pos, if (b != null) "found" else "null")
-        return b
-    }
+public ExampleMod(IEventBus modBus) {
+    MySoundsClass.SOUND_EVENTS.register(modBus);
+    // other things here
+}
 
-    fun put(pos: BlockPos, browser: MCEFBrowser) {
-        LOGGER.debug("[BrowserCache] put({}, {})", pos, browser.url)
-    fun put(pos: BlockPos, browser: MCEFBrowser) {        browsers[pos] = browser
-    }
-        browsers[pos] = browser
-    }    fun remove(pos: BlockPos) {
-        val b = browsers.remove(pos)
-    fun remove(pos: BlockPos) {        LOGGER.debug("[BrowserCache] remove({}) = {}", pos, if (b != null) "closed" else "absent")
-        browsers.remove(pos)?.close()        b?.close()
-    }
+And voilà, you have a sound event!
 
-    fun clear() {
-    }        LOGGER.debug("[BrowserCache] clear ({} browsers)", browsers.size)
-        browsers.values.forEach { it.close() }
-    fun clear() {        browsers.clear()
-    }
-        browsers.values.forEach { it.close() }}
-        browsers.clear()
+sounds.json
+See also: sounds.json on the Minecraft Wiki
+
+Now, to connect your sound event to actual sound files, we need to create sound definitions. All sound definitions for a namespace are stored in a single file named sounds.json, also known as the sound definitions file, directly in the namespace's root. Every sound definition is a mapping of sound event id (e.g. my_sound) to a JSON sound object. Note that the sound event ids do not specify a namespace, as that is already determined by the namespace the sound definitions file is in. An example sounds.json would look something like this:
+
+{
+    // Sound definition for the sound event "examplemod:my_sound"
+    "my_sound": {
+        // List of sound objects. If this contains more than one element, an element will be chosen randomly.
+        "sounds": [
+            // Only name is required, all other properties are optional.
+            {
+                // Location of the sound file, relative to the namespace's sounds folder.
+                // This example references a sound at assets/examplemod/sounds/sound_1.ogg.
+                "name": "examplemod:sound_1",
+                // May be "sound" or "event". "sound" causes the name to refer to a sound file.
+                // "event" causes the name to refer to another sound event. Defaults to "sound".
+                "type": "sound",
+                // The volume this sound will be played at. Must be between 0.0 and 1.0 (default).
+                "volume": 0.8,
+                // The pitch value the sound will be played at.
+                // Must be between 0.0 and 2.0. Defaults to 1.0.
+                "pitch": 1.1,
+                // Weight of this sound when choosing a sound from the sounds list. Defaults to 1.
+                "weight": 3,
+                // If true, the sound will be streamed from the file instead of loaded all at once.
+                // Recommended for sound files that are more than a few seconds long. Defaults to false.
+                "stream": true,
+                // Manual override for the attenuation distance. Defaults to 16. Ignored by fixed range sound events.
+                "attenuation_distance": 8,
+                // If true, the sound will be loaded into memory on pack load, instead of when the sound is played.
+                // Vanilla uses this for underwater ambience sounds. Defaults to false.
+                "preload": true
+            },
+            // Shortcut for { "name": "examplemod:sound_2" }
+            "examplemod:sound_2"
+        ]
+    },
+    "my_fixed_sound": {
+        // Optional. If true, replaces sounds from other resource packs instead of adding to them.
+        // See the Merging chapter below for more information.
+        "replace": true,
+        // The translation key of the subtitle displayed when this sound event is triggered.
+        "subtitle": "examplemod.my_fixed_sound",
+        "sounds": [
+            "examplemod:sound_1",
+            "examplemod:sound_2"
+        ]
     }
 }
-Thought: 262ms
-Now add logging to InputHandler.
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\input\InputHandler.kt
-import net.minecraft.world.phys.Vec3import net.minecraft.world.phys.Vec3
-import net.neoforged.neoforge.network.PacketDistributorimport net.neoforged.neoforge.network.PacketDistributor
 
-object InputHandler {object InputHandler {
-    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
+Merging
+Unlike most other resource files, sounds.json do not overwrite values in packs below them. Instead, they are merged together and then interpreted as one combined sounds.json file. Consider sounds sound_1, sound_2, sound_3 and sound_4 being defined in two sounds.json files from two different resource packs RP1 and RP2, where RP2 is placed below RP1:
 
-    var activeMonitor: MonitorBlockEntity? = null
-    var activeMonitor: MonitorBlockEntity? = null        private set
-        private set
-    fun isInputActive(): Boolean = activeMonitor != null
-    fun isInputActive(): Boolean = activeMonitor != null
-    fun activate(be: MonitorBlockEntity) {
-    fun activate(be: MonitorBlockEntity) {        val master = be.master()
-        val master = be.master()        val shape = master.shape
-        val shape = master.shape ?: return        LOGGER.debug("[InputHandler] activate at {} master={} shape={}", be.blockPos, master.blockPos, shape)
-        if (shape == null) return
-        activeMonitor = be
-        val browser = ClientBrowserCache.get(master.blockPos)
-        activeMonitor = be        if (browser == null) {
-        val browser = ClientBrowserCache.get(master.blockPos)            val sizeW = shape.width * 120
-        if (browser == null) {            val sizeH = shape.height * 120
-            val b = MCEF.createBrowser(master.currentUrl, false,            LOGGER.debug("[InputHandler] creating browser {}x{} url={}", sizeW, sizeH, master.currentUrl)
-                shape.width * 120, shape.height * 120)            val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
-            ClientBrowserCache.put(master.blockPos, b)
-        }
-        Minecraft.getInstance().mouseHandler.grabMouse()
+sounds.json in RP1:
+
+{
+    "sound_1": {
+        "sounds": [
+            "sound_1"
+        ]
+    },
+    "sound_2": {
+        "replace": true,
+        "sounds": [
+            "sound_2"
+        ]
+    },
+    "sound_3": {
+        "sounds": [
+            "sound_3"
+        ]
+    },
+    "sound_4": {
+        "replace": true,
+        "sounds": [
+            "sound_4"
+        ]
     }
-            ClientBrowserCache.put(master.blockPos, b)
-        }    fun deactivate() {
-        Minecraft.getInstance().mouseHandler.grabMouse()        LOGGER.debug("[InputHandler] deactivate")
-    }        activeMonitor?.let {
-            ClientBrowserCache.remove(it.master().blockPos)
-    fun deactivate() {        }
-        activeMonitor = null
-        activeMonitor?.let {        Minecraft.getInstance().mouseHandler.releaseMouse()
-            ClientBrowserCache.remove(it.master().blockPos)    }
-        }
-        activeMonitor = null    fun openUrlScreen(be: MonitorBlockEntity) {
-        Minecraft.getInstance().mouseHandler.releaseMouse()        LOGGER.debug("[InputHandler] openUrlScreen for {}", be.blockPos)
-    }        Minecraft.getInstance().setScreen(UrlScreen(be.master()))
+}
+
+sounds.json in RP2:
+
+{
+    "sound_1": {
+        "sounds": [
+            "sound_5"
+        ]
+    },
+    "sound_2": {
+        "sounds": [
+            "sound_6"
+        ]
+    },
+    "sound_3": {
+        "replace": true,
+        "sounds": [
+            "sound_7"
+        ]
+    },
+    "sound_4": {
+        "replace": true,
+        "sounds": [
+            "sound_8"
+        ]
     }
-    fun openUrlScreen(be: MonitorBlockEntity) {
-    fun updateUrl(be: MonitorBlockEntity, url: String) {
-        Minecraft.getInstance().setScreen(UrlScreen(be.master()))        LOGGER.debug("[InputHandler] updateUrl {} -> {}", be.blockPos, url)
-    }        be.currentUrl = url
-        ClientBrowserCache.get(be.master().blockPos)?.loadURL(url)
-    fun updateUrl(be: MonitorBlockEntity, url: String) {        PacketDistributor.sendToServer(MonitorUpdatePacket(
-            be.blockPos.x, be.blockPos.y, be.blockPos.z, url
+}
 
-        be.currentUrl = url
-        ClientBrowserCache.get(be.master().blockPos)?.loadURL(url)
-        PacketDistributor.sendToServer(MonitorUpdatePacket(
-            be.blockPos.x, be.blockPos.y, be.blockPos.z, url
-Thought: 465ms
-Now add logging to the renderer.
-Now add logging to the renderer:
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\renderer\MonitorBlockEntityRenderer.kt
-import org.joml.Vector3fimport org.joml.Vector3f
-import org.joml.Vector4fimport org.joml.Vector4f
+The combined (merged) sounds.json file the game would then go on and use to load sounds would look something look this (only in memory, this file is never written anywhere):
 
-class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : BlockEntityRenderer<MonitorBlockEntity> {class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : BlockEntityRenderer<MonitorBlockEntity> {
-    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
+{
+    "sound_1": {
+        // replace false and false: add from lower pack, then from upper pack
+        "sounds": [
+            "sound_5",
+            "sound_1"
+        ]
+    },
+    "sound_2": {
+        // replace true in upper pack and false in lower pack: add from upper pack only
+        "sounds": [
+            "sound_2"
+        ]
+    },
+    "sound_3": {
+        // replace false in upper pack and true in lower pack: add from lower pack, then from upper pack
+        // Would still discard values from a third resource pack sitting below RP2
+        "sounds": [
+            "sound_7",
+            "sound_3"
+        ]
+    },
+    "sound_4": {
+        // replace true and true: add from upper pack only
+        "sounds": [
+            "sound_8"
+        ]
+    }
+}
 
-    companion object {
-    companion object {        private val renderTypeCache = mutableMapOf<Int, RenderType>()
-        private val renderTypeCache = mutableMapOf<Int, RenderType>()
-        bufferSource: MultiBufferSource,
-        bufferSource: MultiBufferSource,        packedLight: Int,
-        packedLight: Int,        packedOverlay: Int
-        packedOverlay: Int    ) {
-    ) {        if (!entity.isActive) {
-        if (!entity.isActive) return            LOGGER.trace("[Renderer] skip inactive at {}", entity.blockPos)
-            return
-        }
-        val master = entity.master()
-        val browser = ClientBrowserCache.get(master.blockPos)
-        val master = entity.master()        if (browser == null) {
-        val browser = ClientBrowserCache.get(master.blockPos) ?: return            LOGGER.trace("[Renderer] no browser for master {}", master.blockPos)
-            return
-        }
+Playing Sounds
+Minecraft offers various methods to play sounds, and it is sometimes unclear which one should be used. All methods accept a SoundEvent, which can either be your own or a vanilla one (vanilla sound events are found in the SoundEvents class). For the following method descriptions, client and server refer to the logical client and logical server, respectively.
 
-        val state = entity.blockState
-        val facing = state.getValue(MonitorBlock.FACING)
-        val shape = entity.shape
-        val state = entity.blockState        if (shape == null) {
-        val facing = state.getValue(MonitorBlock.FACING)            LOGGER.trace("[Renderer] no shape for {}", entity.blockPos)
-        val shape = entity.shape ?: return            return
-        }
+Level
+playSeededSound(Entity entity, double x, double y, double z, Holder<SoundEvent> soundEvent, SoundSource soundSource, float volume, float pitch, long seed)
+Client behavior: If the player passed in is the local player, play the sound event to the player at the given location, otherwise no-op.
+Server behavior: A packet instructing the client to play the sound event to the player at the given location is sent to all players except the one passed in.
+Usage: Call from client-initiated code that will run on both sides. The server not playing it to the initiating player prevents playing the sound event twice to them. Alternatively, call from server-initiated code (e.g. a [block entity][be]) with a null player to play the sound to everyone.
+playSound(Entity entity, double x, double y, double z, SoundEvent soundEvent, SoundSource soundSource, float volume, float pitch)
+Forwards to playSeededSound with a random seed selected and the holder wrapped around the SoundEvent
+playSound(Entity entity, BlockPos pos, SoundEvent soundEvent, SoundSource soundSource, float volume, float pitch)
+Forwards to the above method with x, y and z taking the values of pos.getX() + 0.5, pos.getY() + 0.5 and pos.getZ() + 0.5, respectively.
+playLocalSound(double x, double y, double z, SoundEvent soundEvent, SoundSource soundSource, float volume, float pitch, boolean distanceDelay)
+Client behavior: Plays the sound to the player at the given location. Does not send anything to the server. If distanceDelay is true, delays the sound based on the distance to the player.
+Server behavior: No-op.
+Usage: Called from custom packets sent from the server. Vanilla uses this for thunder sounds.
+playPlayerSound(SoundEvent soundEvent, SoundSource soundSource, float volume, float pitch)
+Client behavior: Plays the sound that is bound to the player's location. Does not send anything to the server.
+Server behavior: No-op.
+Usage: Vanilla uses this for ambient block sounds.
+ClientLevel
+playLocalSound(BlockPos pos, SoundEvent soundEvent, SoundSource soundSource, float volume, float pitch, boolean distanceDelay)
+Forwards to Level#playLocalSound with x, y and z taking the values of pos.getX() + 0.5, pos.getY() + 0.5 and pos.getZ() + 0.5, respectively.
+Entity
+playSound(SoundEvent soundEvent, float volume, float pitch)
+Forwards to Level#playSound with null as the player, Entity#getSoundSource as the sound source, the entity's position for x/y/z, and the other parameters passed in.
+Player
+playSound(SoundEvent soundEvent, float volume, float pitch) (overrides the method in Entity)
+Forwards to Level#playSound with this as the player, SoundSource.PLAYER as the sound source, the player's position for x/y/z, and the other parameters passed in. As such, the client/server behavior mimics the one from Level#playSound:
+Client behavior: Play the sound event to the client player at the given location.
+Server behavior: Play the sound event to everyone near the given location except the player this method was called on.
+Datagen
+Sound files themselves can of course not be datagenned, but sounds.json files can. To do so, we extend SoundDefinitionsProvider and override the registerSounds() method:
 
-        val relX = entity.blockPos.x - shape.topLeft.x
-        val relY = entity.blockPos.y - shape.topLeft.y
-        val relZ = entity.blockPos.z - shape.topLeft.z
-        val relX = entity.blockPos.x - shape.topLeft.x        val vMin = row.toFloat() / shape.height
-        val relY = entity.blockPos.y - shape.topLeft.y        val vMax = (row + 1).toFloat() / shape.height
-        val relZ = entity.blockPos.z - shape.topLeft.z
-        val vMin = row.toFloat() / shape.height        val textureId = browser.renderer.textureID
-        val vMax = (row + 1).toFloat() / shape.height        LOGGER.trace("[Renderer] {} col={} row={} uv=[{:.2f},{:.2f}]x[{:.2f},{:.2f}] texId={}",
-            entity.blockPos, col, row, uMin, uMax, vMin, vMax, textureId)
-        val textureId = browser.renderer.textureID        val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))
+public class MySoundDefinitionsProvider extends SoundDefinitionsProvider {
+    // Parameters can be obtained from `GatherDataEvent.Client`.
+    public MySoundDefinitionsProvider(PackOutput output) {
+        // Use your actual mod id instead of "examplemod".
+        super(output, "examplemod");
+    }
 
-        poseStack.pushPose()
-        renderScreenFace(poseStack, buffer, facing, uMin, uMax, vMin, vMax)
-        val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))
+    @Override
+    public void registerSounds() {
+        // Accepts a Holder<SoundEvent>, a SoundEvent, or a Identifier as the first parameter.
+        add(MySoundsClass.MY_SOUND, SoundDefinition.definition()
+            // Add sound objects to the sound definition. Parameter is a vararg.
+            .with(
+                // Accepts either a string or a Identifier as the first parameter.
+                // The second parameter can be either SOUND or EVENT, and can be omitted if the former.
+                sound("examplemod:sound_1", SoundDefinition.SoundType.SOUND)
+                    // Sets the volume. Also has a double counterpart.
+                    .volume(0.8f)
+                    // Sets the pitch. Also has a double counterpart.
+                    .pitch(1.2f)
+                    // Sets the weight.
+                    .weight(2)
+                    // Sets the attenuation distance.
+                    .attenuationDistance(8)
+                    // Enables streaming.
+                    // Also has a parameterless overload that defers to stream(true).
+                    .stream(true)
+                    // Enables preloading.
+                    // Also has a parameterless overload that defers to preload(true).
+                    .preload(true),
+                // The shortest we can get.
+                sound("examplemod:sound_2")
+            )
+            // Sets the subtitle.
+            .subtitle("sound.examplemod.sound_1")
+            // Enables replacing.
+            .replace(true)
+        );
+    }
+}
 
-        poseStack.pushPose()
-        renderScreenFace(poseStack, buffer, facing, uMin, uMax, vMin, vMax)
-Thought: 622ms
-The trace log formatting with {:.2f} won't work in SLF4J. Let me fix that.
-← Edit MinecraftWebBrowserExplorerMod\src\main\kotlin\com\littlemine\webbrowser\client\renderer\MonitorBlockEntityRenderer.kt
-val vMin = row.toFloat() / shape.heightval vMin = row.toFloat() / shape.height
-val vMax = (row + 1).toFloat() / shape.heightval vMax = (row + 1).toFloat() / shape.height
+As with every data provider, don't forget to register the provider to the event:
 
-val textureId = browser.renderer.textureIDval textureId = browser.renderer.textureID
-LOGGER.trace("[Renderer] {} col={} row={} uv=[{:.2f},{:.2f}]x[{:.2f},{:.2f}] texId={}",LOGGER.trace("[Renderer] {} col={} row={} uv=[{},{}]x[{},{}] texId={}",
-    entity.blockPos, col, row, uMin, uMax, vMin, vMax, textureId)
-val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))    entity.blockPos, col, row, uMin, uMax, vMin, vMax, textureId)
-val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))
-poseStack.pushPose()
-poseStack.pushPose()
+@SubscribeEvent // on the mod event bus
+public static void gatherData(GatherDataEvent.Client event) {
+    event.createProvider(MySoundDefinitionsProvider::new);
+}
+
+Previous
+Particles
+Next
+Textures
+Terminology
+Creating SoundEvents
+sounds.json
+Merging
+Playing Sounds
+Level
+ClientLevel
+Entity
+Player
+Datagen
+Docs
+NeoForge Documentation
+Toolchain Features
+Primers
+User Guide
+Modpack Development
+Contributing to the Documentation
+Links
+Discord
+Main Website
+GitHub
+NOT AN OFFICIAL MINECRAFT WEBSITE. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+
+Copyright © 2026, under the MIT license. Built with Docusaurus. "
+Thought: 5.1s
+The user sent me a link to NeoForge documentation about sounds. They want me to read this to understand how to implement the audio system for the monitor. Let me process this information.
+
+Key takeaways from the docs:
+1. SoundEvents are registered objects
+2. Sound definitions go in sounds.json
+3. Playing sounds uses Level.playSound() methods
+4. For positional audio at a specific block location, use level.playSound(null, pos, soundEvent, source, volume, pitch) - this plays to everyone near the position
+5. For player-local audio, use player.playSound(soundEvent, volume, pitch) or level.playSound(player, x, y, z, ...) which plays to everyone except the player
+6. The sound file must be mono for attenuation to work
+
+But wait - this is about Minecraft's sound system. The user wants audio FROM the browser (MCEF). MCEF has its own audio system - when a browser plays audio (like a YouTube video), MCEF handles it. The question is where that audio is routed in Minecraft.
+
+Looking at MCEF, it likely has audio output options:
+- Audio plays directly (like any other app)
+- Audio is captured and played through Minecraft's sound system at a specific position
+
+But the user said they want FIELDS in the GUI first, and to document it in the .md. The implementation of actual audio routing is a future task.
+
+However, the docs the user sent are about Minecraft's sound system. This suggests they want me to understand how to use Minecraft's sound system for the monitor audio.
+
+Actually, re-reading the user's message more carefully - they just pasted the NeoForge sound docs. They probably found this useful context for implementing audio. The actual request is still the same: add the fields to the GUI and document in the .md.
+
+Let me continue with what I was doing - adding audioMode and volume fields, the GUI controls, the packet, and documentation.
+
+Let me finish implementing all the changes now.
+⚙invalid [tool=createArtifactManifest, error=Model tried to call unavailable tool 'createArtifactManifest'. Available tools: bash, edit, glob, grep, invalid, question, read, skill, task, todowrite, webfetch, websearch, write.]

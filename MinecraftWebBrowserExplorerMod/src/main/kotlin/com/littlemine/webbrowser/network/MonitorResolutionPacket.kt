@@ -6,40 +6,31 @@ import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.ResourceLocation
 
-class MonitorInputPacket(
+class MonitorResolutionPacket(
     val posX: Int,
     val posY: Int,
     val posZ: Int,
-    val mouseX: Double,
-    val mouseY: Double,
-    val button: Int,
-    val pressed: Boolean
+    val pixelsPerBlock: Int
 ) : CustomPacketPayload {
 
     companion object {
-        val TYPE: CustomPacketPayload.Type<MonitorInputPacket> =
-            CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath(MonitorMod.MOD_ID, "monitor_input"))
+        val TYPE: CustomPacketPayload.Type<MonitorResolutionPacket> =
+            CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath(MonitorMod.MOD_ID, "monitor_resolution"))
 
-        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, MonitorInputPacket> =
+        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, MonitorResolutionPacket> =
             StreamCodec.of(
                 { buf, packet ->
                     buf.writeInt(packet.posX)
                     buf.writeInt(packet.posY)
                     buf.writeInt(packet.posZ)
-                    buf.writeDouble(packet.mouseX)
-                    buf.writeDouble(packet.mouseY)
-                    buf.writeInt(packet.button)
-                    buf.writeBoolean(packet.pressed)
+                    buf.writeInt(packet.pixelsPerBlock)
                 },
                 { buf ->
-                    MonitorInputPacket(
+                    MonitorResolutionPacket(
                         buf.readInt(),
                         buf.readInt(),
                         buf.readInt(),
-                        buf.readDouble(),
-                        buf.readDouble(),
-                        buf.readInt(),
-                        buf.readBoolean()
+                        buf.readInt()
                     )
                 }
             )

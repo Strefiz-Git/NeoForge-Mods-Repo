@@ -1,5 +1,6 @@
 package com.littlemine.webbrowser.client
 
+import com.cinemamod.mcef.MCEF
 import com.cinemamod.mcef.MCEFBrowser
 import net.minecraft.core.BlockPos
 
@@ -16,21 +17,33 @@ object ClientBrowserCache {
     fun put(pos: BlockPos, browser: MCEFBrowser) {
         val old = browsers.put(pos, browser)
         if (old != null && old !== browser) {
-            LOGGER.debug("[BrowserCache] put({}) - closing old browser, url={}", pos, old.url)
+            LOGGER.info("[BrowserCache] put({}) - closing old browser, url={}", pos, old.url)
             old.close()
         } else {
-            LOGGER.debug("[BrowserCache] put({}) - new browser, url={}", pos, browser.url)
+            LOGGER.info("[BrowserCache] put({}) - new browser, url={}", pos, browser.url)
         }
     }
 
     fun remove(pos: BlockPos) {
         val b = browsers.remove(pos)
-        LOGGER.debug("[BrowserCache] remove({}) = {}", pos, if (b != null) "closed url=" + b.url else "absent")
+        LOGGER.info("[BrowserCache] remove({}) = {}", pos, if (b != null) "closed url=" + b.url else "absent")
         b?.close()
     }
 
+    fun recreate(pos: BlockPos, width: Int, height: Int, url: String): MCEFBrowser? {
+        browsers.remove(pos)?.close()
+        val b = MCEF.createBrowser(url, false, width, height)
+        if (b != null) {
+            browsers[pos] = b
+            LOGGER.info("[BrowserCache] recreate({}) {}x{} url={} textureID={}", pos, width, height, url, b.renderer.textureID)
+        } else {
+            LOGGER.error("[BrowserCache] recreate({}) - MCEF.createBrowser returned null!", pos)
+        }
+        return b
+    }
+
     fun clear() {
-        LOGGER.debug("[BrowserCache] clear ({} browsers)", browsers.size)
+        LOGGER.info("[BrowserCache] clear ({} browsers)", browsers.size)
         browsers.values.forEach { it.close() }
         browsers.clear()
     }

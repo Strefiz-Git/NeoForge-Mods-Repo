@@ -61,7 +61,7 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
 
     override fun getStateForPlacement(context: BlockPlaceContext): BlockState {
         val facing = context.clickedFace
-        LOGGER.debug("[MonitorBlock] getStateForPlacement at {} facing={}", context.clickedPos, facing)
+        LOGGER.info("[MonitorBlock] getStateForPlacement at {} facing={}", context.clickedPos, facing)
         return defaultBlockState().setValue(FACING, facing)
     }
 
@@ -70,7 +70,7 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
     }
 
     override fun onPlace(state: BlockState, level: Level, pos: BlockPos, oldState: BlockState, movedByPiston: Boolean) {
-        LOGGER.debug("[MonitorBlock] onPlace at {} facing={} active={}", pos, state.getValue(FACING), state.getValue(ACTIVE))
+        LOGGER.info("[MonitorBlock] onPlace at {} facing={} active={}", pos, state.getValue(FACING), state.getValue(ACTIVE))
         if (state.block !== oldState.block) {
             val be = level.getBlockEntity(pos)
             if (be is MonitorBlockEntity) be.tryFormMonitor()
@@ -80,14 +80,14 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
     override fun useWithoutItem(state: BlockState, level: Level, pos: BlockPos, player: Player, hit: BlockHitResult): InteractionResult {
         val be = level.getBlockEntity(pos)
         if (be is MonitorBlockEntity && be.isActive) {
-            LOGGER.debug("[MonitorBlock] useWithoutItem on active monitor {} - blocked (need command)", pos)
+            LOGGER.info("[MonitorBlock] useWithoutItem on active monitor {} - blocked (need command)", pos)
             return InteractionResult.PASS
         }
         return InteractionResult.PASS
     }
 
     override fun onRemove(state: BlockState, level: Level, pos: BlockPos, newState: BlockState, movedByPiston: Boolean) {
-        LOGGER.debug("[MonitorBlock] onRemove at {} active={}", pos, state.getValue(ACTIVE))
+        LOGGER.info("[MonitorBlock] onRemove at {} active={}", pos, state.getValue(ACTIVE))
         if (state.block !== newState.block) {
             val be = level.getBlockEntity(pos)
             if (be is MonitorBlockEntity) be.invalidateMonitor()

@@ -19,6 +19,9 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     var width: Int = 1
     var height: Int = 1
     var currentUrl: String = "https://www.google.com"
+    var pixelsPerBlock: Int = 120
+    var audioMode: Int = 0 // 0=player, 1=center_block
+    var volume: Int = 100 // 0-100
     var isActive: Boolean = false
     var masterPos: BlockPos = blockPos
     var shape: MonitorShape? = null
@@ -32,9 +35,12 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     }
 
     fun invalidateMonitor() {
-        if (!isActive) return
+        if (!isActive) {
+            LOGGER.info("[BE] invalidateMonitor at {} - not active, skipping", blockPos)
+            return
+        }
         val s = shape ?: return
-        LOGGER.debug("[BE] invalidateMonitor at {} shape={}", blockPos, s)
+        LOGGER.info("[BE] invalidateMonitor at {} shape={}", blockPos, s)
         isActive = false
 
         val oldMasterPos = masterPos
@@ -87,9 +93,12 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     fun tryFormMonitor() {
         val level = level ?: return
         val detected = MonitorShapeDetector.findRectangle(blockPos, level)
-        LOGGER.debug("[BE] tryFormMonitor at {} detected={} (was active={} oldShape={})",
+        LOGGER.info("[BE] tryFormMonitor at {} detected={} (was active={} oldShape={})",
             blockPos, detected, isActive, shape)
-        if (detected == null) return
+        if (detected == null) {
+            LOGGER.info("[BE] tryFormMonitor at {} - no valid shape detected (too small, wrong ratio, or not filled)", blockPos)
+            return
+        }
         val facing = detected.facing
         val rightDir = detected.rightDir
         val downDir = detected.downDir
@@ -118,6 +127,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                 if (be is MonitorBlockEntity && be !== this) {
                     be.width = detected.width
                     be.height = detected.height
+                    be.pixelsPerBlock = pixelsPerBlock
                     be.isActive = true
                     be.masterPos = detected.topLeft
                     be.shape = detected
@@ -125,7 +135,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                 }
             }
         }
-        LOGGER.debug("[BE] tryFormMonitor SUCCESS: {}x{} active at master={} resized={}",
+        LOGGER.info("[BE] tryFormMonitor SUCCESS: {}x{} active at master={} resized={}",
             width, height, masterPos, wasResized)
         setChanged()
 
@@ -146,6 +156,9 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         tag.putInt("width", width)
         tag.putInt("height", height)
         tag.putString("url", currentUrl)
+        tag.putInt("pixelsPerBlock", pixelsPerBlock)
+        tag.putInt("audioMode", audioMode)
+        tag.putInt("volume", volume)
         tag.putBoolean("active", isActive)
         tag.putLong("master_pos", masterPos.asLong())
     }
@@ -155,6 +168,9 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         width = tag.getInt("width")
         height = tag.getInt("height")
         currentUrl = tag.getString("url")
+        if (tag.contains("pixelsPerBlock")) pixelsPerBlock = tag.getInt("pixelsPerBlock")
+        if (tag.contains("audioMode")) audioMode = tag.getInt("audioMode")
+        if (tag.contains("volume")) volume = tag.getInt("volume")
         isActive = tag.getBoolean("active")
         if (tag.contains("master_pos")) masterPos = BlockPos.of(tag.getLong("master_pos"))
         recalculateClientShape()
@@ -164,7 +180,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         if (level?.isClientSide != true || !isActive || shape != null) return
         val detected = level?.let { MonitorShapeDetector.findRectangle(blockPos, it) }
         if (detected != null) {
-            LOGGER.debug("[BE] recalculated shape on client: {}x{} master={}", detected.width, detected.height, detected.topLeft)
+            LOGGER.info("[BE] recalculated shape on client: {}x{} master={}", detected.width, detected.height, detected.topLeft)
             shape = detected
             width = detected.width
             height = detected.height
