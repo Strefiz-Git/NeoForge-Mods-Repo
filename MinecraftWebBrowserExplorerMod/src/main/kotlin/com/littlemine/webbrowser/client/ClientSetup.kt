@@ -57,11 +57,6 @@ object ClientGameEvents {
             clearRenderTypeCache()
         }
 
-        ClientBridge.onMonitorCommandUse = { be ->
-            LOGGER.debug("[ClientGameEvents] onMonitorCommandUse at {}", be.blockPos)
-            InputHandler.syncToMonitor(be)
-        }
-
         ClientBridge.onMonitorCommandShiftUse = { be ->
             LOGGER.debug("[ClientGameEvents] onMonitorCommandShiftUse at {}", be.blockPos)
             InputHandler.openUrlScreen(be)
@@ -110,13 +105,17 @@ object ClientGameEvents {
 
     @SubscribeEvent
     fun onKeyPress(event: InputEvent.Key) {
-        if (InputHandler.isInputActive()) {
-            if (event.key == 256) {
-                LOGGER.debug("[ClientGameEvents] ESC pressed - deactivating input")
-                InputHandler.deactivate()
-                return
-            }
-            InputHandler.onKeyPress(event.key, event.scanCode, event.modifiers)
+        if (!InputHandler.isInputActive()) return
+
+        if (event.key == 256) {
+            LOGGER.debug("[ClientGameEvents] ESC pressed - deactivating input")
+            InputHandler.deactivate()
+            return
+        }
+
+        when (event.action) {
+            1, 2 -> InputHandler.onKeyPress(event.key, event.scanCode, event.modifiers)
+            0 -> InputHandler.onKeyRelease(event.key, event.scanCode, event.modifiers)
         }
     }
 

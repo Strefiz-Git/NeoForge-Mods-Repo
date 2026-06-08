@@ -3,5 +3,13 @@
     "block.webbrowser.monitor_block": "Monitor Block",
     "item.webbrowser.monitor_block": "Monitor Block",
     "item.webbrowser.monitor_command": "Monitor Command",
-    "message.webbrowser.need_command": "You need a Monitor Command to interact with this monitor!"
+    "message.webbrowser.need_command": "You need a Monitor Command to interact with this monitor!",
+    "message.webbrowser.occupied": "This monitor is already occupied!",
+    "message.webbrowser.out_of_range": "You are too far from the monitor! (max 6 chunks)",
+    "message.webbrowser.not_looking": "Look at the monitor screen!",
+    "message.webbrowser.connected": "Command connected!",
+    "message.webbrowser.disconnected": "Command disconnected - monitor no longer active",
+    "message.webbrowser.already_connected": "This command is already connected to a monitor",
+    "tooltip.webbrowser.connected_to": "Connected to: %d, %d, %d",
+    "tooltip.webbrowser.not_connected": "Not connected"
 }

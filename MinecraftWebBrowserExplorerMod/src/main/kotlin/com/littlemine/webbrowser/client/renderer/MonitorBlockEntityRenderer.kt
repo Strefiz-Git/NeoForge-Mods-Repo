@@ -83,8 +83,9 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
             else -> return
         }
 
-        val uMin = col.toFloat() / shape.width
-        val uMax = (col + 1).toFloat() / shape.width
+        // MCEF texture is horizontally mirrored - flip U coordinates
+        val uMin = (shape.width - 1 - col).toFloat() / shape.width
+        val uMax = (shape.width - col).toFloat() / shape.width
         val vMin = row.toFloat() / shape.height
         val vMax = (row + 1).toFloat() / shape.height
 

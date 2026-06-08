@@ -19,9 +19,10 @@ data class MonitorShape(
 object MonitorShapeDetector {
     private val LOGGER: Logger = com.mojang.logging.LogUtils.getLogger()
 
-    private const val MIN_SIZE = 1
-    private const val MAX_WIDTH = 48
-    private const val MAX_HEIGHT = 27
+    private const val MIN_WIDTH = 6
+    private const val MIN_HEIGHT = 3
+    private const val MAX_WIDTH = 320
+    private const val MAX_HEIGHT = 180
 
     fun findRectangle(origin: BlockPos, level: Level): MonitorShape? {
         val originState = level.getBlockState(origin)
@@ -40,12 +41,17 @@ object MonitorShapeDetector {
 
         LOGGER.debug("[ShapeDetector] topLeft={} facing={} right={} down={} {}x{}", topLeft, facing, rightDir, downDir, width, height)
 
-        if (width < MIN_SIZE || height < MIN_SIZE) {
-            LOGGER.debug("[ShapeDetector] too small (min {}x{})", MIN_SIZE, MIN_SIZE)
+        if (width < MIN_WIDTH || height < MIN_HEIGHT) {
+            LOGGER.debug("[ShapeDetector] too small (min {}x{})", MIN_WIDTH, MIN_HEIGHT)
             return null
         }
         if (width > MAX_WIDTH || height > MAX_HEIGHT) {
             LOGGER.debug("[ShapeDetector] too large (max {}x{})", MAX_WIDTH, MAX_HEIGHT)
+            return null
+        }
+        // Max aspect ratio 16:9
+        if (width.toLong() * 9 > height.toLong() * 16) {
+            LOGGER.debug("[ShapeDetector] aspect ratio too wide ({}x{} exceeds 16:9)", width, height)
             return null
         }
 

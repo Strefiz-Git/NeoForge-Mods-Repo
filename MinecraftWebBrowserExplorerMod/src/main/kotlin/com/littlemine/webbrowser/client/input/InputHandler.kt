@@ -4,8 +4,6 @@ import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.client.ClientBrowserCache
-import com.littlemine.webbrowser.network.MonitorInputPacket
-import com.littlemine.webbrowser.network.MonitorUpdatePacket
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -13,7 +11,6 @@ import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
-import net.neoforged.neoforge.network.PacketDistributor
 
 object InputHandler {
     private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
@@ -21,9 +18,13 @@ object InputHandler {
     var activeMonitor: MonitorBlockEntity? = null
         private set
 
+    private var lastMouseX: Double = 0.0
+    private var lastMouseY: Double = 0.0
+    private var isOnScreen: Boolean = false
+
     fun isInputActive(): Boolean = activeMonitor != null
 
-    fun activate(be: MonitorBlockEntity) {
+    fun syncToMonitor(be: MonitorBlockEntity) {
         if (isInputActive()) {
             if (activeMonitor?.master()?.blockPos == be.master().blockPos) return
             deactivate()
@@ -34,14 +35,14 @@ object InputHandler {
             master.recalculateClientShape()
             shape = master.shape
         }
-        LOGGER.debug("[InputHandler] activate at {} master={} shape={}", be.blockPos, master.blockPos, shape)
+        LOGGER.debug("[InputHandler] syncToMonitor at {} master={} shape={}", be.blockPos, master.blockPos, shape)
         if (shape == null) return
-        activeMonitor = be
+
         val browser = ClientBrowserCache.get(master.blockPos)
         if (browser == null) {
             val sizeW = shape.width * BrowserConstants.BLOCK_PIXEL_WIDTH
             val sizeH = shape.height * BrowserConstants.BLOCK_PIXEL_HEIGHT
-            LOGGER.debug("[InputHandler] creating browser {}x{} url={}", sizeW, sizeH, master.currentUrl)
+            LOGGER.warn("[InputHandler] no browser for {}, creating {}x{}", master.blockPos, sizeW, sizeH)
             val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
             if (b != null) {
                 ClientBrowserCache.put(master.blockPos, b)
@@ -50,39 +51,19 @@ object InputHandler {
                 return
             }
         }
+
+        activeMonitor = master
+        isOnScreen = false
         Minecraft.getInstance().mouseHandler.grabMouse()
     }
 
     fun deactivate() {
         LOGGER.debug("[InputHandler] deactivate")
         activeMonitor = null
-        Minecraft.getInstance().mouseHandler.releaseMouse()
-    }
-
-    fun syncToMonitor(be: MonitorBlockEntity) {
-        LOGGER.debug("[InputHandler] syncToMonitor at {}", be.blockPos)
-        val master = be.master()
-        var shape = master.shape
-        if (shape == null && master.level?.isClientSide == true) {
-            master.recalculateClientShape()
-            shape = master.shape
-        }
-        if (shape == null) return
-        val browser = ClientBrowserCache.get(master.blockPos)
-        if (browser == null) {
-            val sizeW = shape.width * BrowserConstants.BLOCK_PIXEL_WIDTH
-            val sizeH = shape.height * BrowserConstants.BLOCK_PIXEL_HEIGHT
-            LOGGER.debug("[InputHandler] creating browser {}x{} url={}", sizeW, sizeH, master.currentUrl)
-            val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
-            if (b != null) {
-                ClientBrowserCache.put(master.blockPos, b)
-            } else {
-                LOGGER.error("[InputHandler] MCEF.createBrowser returned null!")
-                return
-            }
-        }
-        activeMonitor = be
-        Minecraft.getInstance().mouseHandler.grabMouse()
+        isOnScreen = false
+        try {
+            Minecraft.getInstance().mouseHandler.releaseMouse()
+        } catch (_: Exception) { }
     }
 
     fun openUrlScreen(be: MonitorBlockEntity) {
@@ -94,35 +75,64 @@ object InputHandler {
         LOGGER.debug("[InputHandler] updateUrl {} -> {}", be.blockPos, url)
         be.currentUrl = url
         ClientBrowserCache.get(be.master().blockPos)?.loadURL(url)
-        PacketDistributor.sendToServer(MonitorUpdatePacket(
-            be.blockPos.x, be.blockPos.y, be.blockPos.z, url
-        ))
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+            com.littlemine.webbrowser.network.MonitorUpdatePacket(
+                be.blockPos.x, be.blockPos.y, be.blockPos.z, url
+            )
+        )
     }
 
     fun onClientTick() {
         val monitor = activeMonitor ?: return
+        val mc = Minecraft.getInstance()
+
+        // Prevent player movement by overriding key mappings
+        // This runs BEFORE input.tick() recalculates movement from key states
+        with(mc.options) {
+            keyUp.setDown(false)
+            keyDown.setDown(false)
+            keyLeft.setDown(false)
+            keyRight.setDown(false)
+            keyJump.setDown(false)
+            keyShift.setDown(false)
+        }
+
         val master = monitor.master()
         val browser = ClientBrowserCache.get(master.blockPos) ?: return
 
-        val (browserX, browserY) = getMousePositionInMonitor(monitor)
-
-        browser.sendMouseMove(browserX.toInt(), browserY.toInt())
+        val hit = raycastForMonitorBlock()
+        if (hit is BlockHitResult && hit.type != HitResult.Type.MISS) {
+            val hitBe = mc.level?.getBlockEntity(hit.blockPos)
+            if (hitBe is MonitorBlockEntity && hitBe.isActive && hitBe.master().blockPos == master.blockPos) {
+                val (browserX, browserY) = calcMousePosition(hit, hitBe.master())
+                lastMouseX = browserX
+                lastMouseY = browserY
+                isOnScreen = true
+                browser.sendMouseMove(browserX.toInt(), browserY.toInt())
+                return
+            }
+        }
+        // Not looking at the screen - don't update mouse position
+        if (isOnScreen) {
+            isOnScreen = false
+        }
     }
 
     fun onMouseClick(button: Int, action: Int, modifiers: Int) {
         val monitor = activeMonitor ?: return
         val master = monitor.master()
         val browser = ClientBrowserCache.get(master.blockPos) ?: return
-        val (x, y) = getMousePositionInMonitor(monitor)
 
         if (action == 1) {
-            browser.sendMousePress(x.toInt(), y.toInt(), button)
-            PacketDistributor.sendToServer(MonitorInputPacket(
-                monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z,
-                x, y, button, true
-            ))
+            browser.sendMousePress(lastMouseX.toInt(), lastMouseY.toInt(), button)
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                com.littlemine.webbrowser.network.MonitorInputPacket(
+                    monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z,
+                    lastMouseX, lastMouseY, button, true
+                )
+            )
         } else {
-            browser.sendMouseRelease(x.toInt(), y.toInt(), button)
+            browser.sendMouseRelease(lastMouseX.toInt(), lastMouseY.toInt(), button)
         }
     }
 
@@ -141,21 +151,12 @@ object InputHandler {
     fun onScroll(deltaX: Double, deltaY: Double) {
         val monitor = activeMonitor ?: return
         val browser = ClientBrowserCache.get(monitor.master().blockPos) ?: return
-        val (x, y) = getMousePositionInMonitor(monitor)
-        browser.sendMouseWheel(x.toInt(), y.toInt(), deltaY, 0)
+        browser.sendMouseWheel(lastMouseX.toInt(), lastMouseY.toInt(), deltaY, 0)
     }
 
-    private fun getMousePositionInMonitor(monitor: MonitorBlockEntity): Pair<Double, Double> {
-        val mc = Minecraft.getInstance()
-        val hit = raycastForMonitor()
-        if (hit !is BlockHitResult || hit.type == HitResult.Type.MISS) return Pair(0.0, 0.0)
-
+    private fun calcMousePosition(hit: BlockHitResult, master: MonitorBlockEntity): Pair<Double, Double> {
+        val shape = master.shape ?: return Pair(lastMouseX, lastMouseY)
         val pos = hit.blockPos
-        val be = mc.level?.getBlockEntity(pos) ?: return Pair(0.0, 0.0)
-        if (be !is MonitorBlockEntity) return Pair(0.0, 0.0)
-
-        val master = be.master()
-        val shape = master.shape ?: return Pair(0.0, 0.0)
         val facing = hit.direction
 
         val relX = pos.x - shape.topLeft.x
@@ -204,7 +205,7 @@ object InputHandler {
         )
     }
 
-    private fun raycastForMonitor(): HitResult {
+    fun raycastForMonitorBlock(): HitResult {
         val mc = Minecraft.getInstance()
         val player = mc.player ?: return BlockHitResult.miss(Vec3.ZERO, Direction.UP, BlockPos.ZERO)
         val reach = player.blockInteractionRange()

@@ -3,5 +3,13 @@
     "block.webbrowser.monitor_block": "Bloco de Monitor",
     "item.webbrowser.monitor_block": "Bloco de Monitor",
     "item.webbrowser.monitor_command": "Comando de Monitor",
-    "message.webbrowser.need_command": "Precisas de um Comando de Monitor para interagir com este monitor!"
+    "message.webbrowser.need_command": "Precisas de um Comando de Monitor para interagir com este monitor!",
+    "message.webbrowser.occupied": "Este monitor já está ocupado!",
+    "message.webbrowser.out_of_range": "Estás demasiado longe do monitor! (máx 6 chunks)",
+    "message.webbrowser.not_looking": "Olha para o ecrã do monitor!",
+    "message.webbrowser.connected": "Comando conectado!",
+    "message.webbrowser.disconnected": "Comando desligado - monitor já não está ativo",
+    "message.webbrowser.already_connected": "Este comando já está conectado a um monitor",
+    "tooltip.webbrowser.connected_to": "Conectado a: %d, %d, %d",
+    "tooltip.webbrowser.not_connected": "Não conectado"
 }
