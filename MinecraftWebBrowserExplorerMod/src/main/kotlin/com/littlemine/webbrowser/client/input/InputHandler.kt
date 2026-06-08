@@ -123,16 +123,19 @@ object InputHandler {
         val master = monitor.master()
         val browser = ClientBrowserCache.get(master.blockPos) ?: return
 
+        // Recalculate mouse position from current crosshair raycast (fresh, not cached)
+        val (mouseX, mouseY) = getCurrentMousePosition()
+
         if (action == 1) {
-            browser.sendMousePress(lastMouseX.toInt(), lastMouseY.toInt(), button)
+            browser.sendMousePress(mouseX.toInt(), mouseY.toInt(), button)
             net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 com.littlemine.webbrowser.network.MonitorInputPacket(
                     monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z,
-                    lastMouseX, lastMouseY, button, true
+                    mouseX, mouseY, button, true
                 )
             )
         } else {
-            browser.sendMouseRelease(lastMouseX.toInt(), lastMouseY.toInt(), button)
+            browser.sendMouseRelease(mouseX.toInt(), mouseY.toInt(), button)
         }
     }
 
@@ -151,7 +154,22 @@ object InputHandler {
     fun onScroll(deltaX: Double, deltaY: Double) {
         val monitor = activeMonitor ?: return
         val browser = ClientBrowserCache.get(monitor.master().blockPos) ?: return
-        browser.sendMouseWheel(lastMouseX.toInt(), lastMouseY.toInt(), deltaY, 0)
+        val (mouseX, mouseY) = getCurrentMousePosition()
+        browser.sendMouseWheel(mouseX.toInt(), mouseY.toInt(), deltaY, 0)
+    }
+
+    private fun getCurrentMousePosition(): Pair<Double, Double> {
+        val monitor = activeMonitor ?: return Pair(lastMouseX, lastMouseY)
+        val master = monitor.master()
+        val hit = raycastForMonitorBlock()
+        if (hit is BlockHitResult && hit.type != HitResult.Type.MISS) {
+            val mc = Minecraft.getInstance()
+            val hitBe = mc.level?.getBlockEntity(hit.blockPos)
+            if (hitBe is MonitorBlockEntity && hitBe.isActive && hitBe.master().blockPos == master.blockPos) {
+                return calcMousePosition(hit, hitBe.master())
+            }
+        }
+        return Pair(lastMouseX, lastMouseY)
     }
 
     private fun calcMousePosition(hit: BlockHitResult, master: MonitorBlockEntity): Pair<Double, Double> {

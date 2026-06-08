@@ -14,6 +14,7 @@ import net.neoforged.fml.common.EventBusSubscriber
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.EntityRenderersEvent
 import net.neoforged.neoforge.client.event.InputEvent
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent
 import net.neoforged.neoforge.event.level.ChunkEvent
 import net.neoforged.neoforge.event.level.LevelEvent
 
@@ -64,15 +65,22 @@ object ClientGameEvents {
     }
 
     @SubscribeEvent
-    fun onChunkUnload(event: ChunkEvent.Unload) {
+    fun onChunkLoad(event: ChunkEvent.Load) {
         val chunk = event.chunk
         if (chunk !is net.minecraft.world.level.chunk.LevelChunk) return
-        LOGGER.trace("[ClientGameEvents] chunk unload at {}", chunk.pos)
         for (be in chunk.blockEntities.values) {
-            if (be is MonitorBlockEntity && be.isMaster) {
-                ClientBrowserCache.remove(be.blockPos)
+            if (be is MonitorBlockEntity && be.isMaster && be.isActive) {
+                val existing = ClientBrowserCache.get(be.blockPos)
+                if (existing == null) {
+                    LOGGER.debug("[ClientGameEvents] chunk loaded with active monitor at {} - browser will be created on interaction", be.blockPos)
+                }
             }
         }
+    }
+
+    @SubscribeEvent
+    fun onChunkUnload(event: ChunkEvent.Unload) {
+        // Don't destroy browsers on chunk unload - they survive until level unload
     }
 
     @SubscribeEvent
@@ -88,9 +96,15 @@ object ClientGameEvents {
         InputHandler.onClientTick()
 
         val mc = Minecraft.getInstance()
-        if (InputHandler.isInputActive() && mc.screen != null) {
-            LOGGER.trace("[ClientGameEvents] closing unexpected screen while input active")
-            mc.setScreen(null)
+        if (InputHandler.isInputActive()) {
+            // Keep mouse grabbed while input is active
+            if (!mc.mouseHandler.isMouseGrabbed) {
+                mc.mouseHandler.grabMouse()
+            }
+            if (mc.screen != null) {
+                LOGGER.trace("[ClientGameEvents] closing unexpected screen while input active")
+                mc.setScreen(null)
+            }
         }
     }
 
@@ -107,22 +121,42 @@ object ClientGameEvents {
     fun onKeyPress(event: InputEvent.Key) {
         if (!InputHandler.isInputActive()) return
 
+        // ESC = deactivate, then let the event through so the game opens pause menu
         if (event.key == 256) {
             LOGGER.debug("[ClientGameEvents] ESC pressed - deactivating input")
             InputHandler.deactivate()
             return
         }
 
+        // Forward key to CEF
         when (event.action) {
             1, 2 -> InputHandler.onKeyPress(event.key, event.scanCode, event.modifiers)
             0 -> InputHandler.onKeyRelease(event.key, event.scanCode, event.modifiers)
         }
+
+        // Reset key mapping to prevent game from processing this key
+        val key = com.mojang.blaze3d.platform.InputConstants.getKey(event.key, event.scanCode)
+        net.minecraft.client.KeyMapping.set(key, false)
     }
 
     @SubscribeEvent
     fun onScroll(event: InputEvent.MouseScrollingEvent) {
         if (InputHandler.isInputActive()) {
             InputHandler.onScroll(event.scrollDeltaX, event.scrollDeltaY)
+            event.setCanceled(true)
+        }
+    }
+
+    @SubscribeEvent
+    fun onLeftClickBlock(event: PlayerInteractEvent.LeftClickBlock) {
+        if (InputHandler.isInputActive()) {
+            event.setCanceled(true)
+        }
+    }
+
+    @SubscribeEvent
+    fun onRightClickBlock(event: PlayerInteractEvent.RightClickBlock) {
+        if (InputHandler.isInputActive()) {
             event.setCanceled(true)
         }
     }
