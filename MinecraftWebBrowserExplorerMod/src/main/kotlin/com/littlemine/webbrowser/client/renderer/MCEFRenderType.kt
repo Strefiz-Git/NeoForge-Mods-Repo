@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.RenderStateShard
 import net.minecraft.client.renderer.RenderType
 
 class MCEFBrowserTextureShard(textureId: () -> Int) : RenderStateShard.EmptyTextureStateShard(
-    { RenderSystem.bindTexture(textureId()) },
+    { RenderSystem.setShaderTexture(0, textureId()) },
     { }
 )
 

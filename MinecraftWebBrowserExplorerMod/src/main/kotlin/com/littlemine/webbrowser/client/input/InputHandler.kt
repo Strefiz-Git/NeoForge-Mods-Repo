@@ -23,6 +23,7 @@ object InputHandler {
     fun isInputActive(): Boolean = activeMonitor != null
 
     fun activate(be: MonitorBlockEntity) {
+        if (isInputActive()) return // prevent spam from held right-click
         val master = be.master()
         var shape = master.shape
         if (shape == null && master.level?.isClientSide == true) {

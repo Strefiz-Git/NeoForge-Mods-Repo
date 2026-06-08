@@ -78,6 +78,10 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val vMax = (row + 1).toFloat() / shape.height
 
         val textureId = browser.renderer.textureID
+        if (textureId == 0) {
+            LOGGER.debug("[Renderer] {} texture ID is 0 (browser not ready yet)", entity.blockPos)
+            return
+        }
         LOGGER.trace("[Renderer] {} col={} row={} uv=[{},{}]x[{},{}] texId={}",
             entity.blockPos, col, row, uMin, uMax, vMin, vMax, textureId)
         val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))
