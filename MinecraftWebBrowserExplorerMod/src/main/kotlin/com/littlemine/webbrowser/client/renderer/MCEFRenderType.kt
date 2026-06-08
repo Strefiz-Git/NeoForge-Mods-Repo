@@ -18,6 +18,7 @@ fun createMCEFRenderType(textureId: () -> Int): RenderType {
         .setShaderState(RenderStateShard.RENDERTYPE_ENTITY_CUTOUT_SHADER)
         .setLightmapState(RenderStateShard.NO_LIGHTMAP)
         .setOverlayState(RenderStateShard.NO_OVERLAY)
+        .setCullState(RenderStateShard.NO_CULL)
         .createCompositeState(false)
     return RenderType.create(
         "mcef_browser",

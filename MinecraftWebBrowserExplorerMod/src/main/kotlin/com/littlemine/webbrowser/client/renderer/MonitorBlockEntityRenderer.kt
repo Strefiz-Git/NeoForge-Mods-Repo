@@ -105,75 +105,67 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
 
         when (facing) {
             Direction.NORTH -> {
-                // Face at z=0, quad slightly OUTSIDE at z=-0.005
-                // Camera at -Z: x=0=left, x=1=right, y=0=bottom, y=1=top
+                // Face at z=0, quad slightly INSIDE at z=0.005 (toward camera at +Z)
                 vertices = arrayOf(
-                    Vector4f(0f, 0f, -0.005f, 1f),
-                    Vector4f(1f, 0f, -0.005f, 1f),
-                    Vector4f(1f, 1f, -0.005f, 1f),
-                    Vector4f(0f, 1f, -0.005f, 1f)
+                    Vector4f(0f, 0f, 0.005f, 1f),
+                    Vector4f(1f, 0f, 0.005f, 1f),
+                    Vector4f(1f, 1f, 0.005f, 1f),
+                    Vector4f(0f, 1f, 0.005f, 1f)
                 )
                 normal = Vector3f(0f, 0f, -1f)
                 swapU = false; swapV = false
             }
             Direction.SOUTH -> {
-                // Face at z=1, quad slightly OUTSIDE at z=1.005
-                // Camera at +Z: x=1=left, x=0=right (mirrored), so swap U
+                // Face at z=1, quad slightly INSIDE at z=0.995 (toward camera at -Z)
                 vertices = arrayOf(
-                    Vector4f(0f, 0f, 1.005f, 1f),
-                    Vector4f(1f, 0f, 1.005f, 1f),
-                    Vector4f(1f, 1f, 1.005f, 1f),
-                    Vector4f(0f, 1f, 1.005f, 1f)
+                    Vector4f(0f, 0f, 0.995f, 1f),
+                    Vector4f(1f, 0f, 0.995f, 1f),
+                    Vector4f(1f, 1f, 0.995f, 1f),
+                    Vector4f(0f, 1f, 0.995f, 1f)
                 )
                 normal = Vector3f(0f, 0f, 1f)
                 swapU = true; swapV = false
             }
             Direction.EAST -> {
-                // Face at x=1, quad slightly OUTSIDE at x=1.005
-                // Camera at +X: z=1=left, z=0=right (mirrored), so swap U
+                // Face at x=1, quad slightly INSIDE at x=0.995 (toward camera at -X)
                 vertices = arrayOf(
-                    Vector4f(1.005f, 0f, 0f, 1f),
-                    Vector4f(1.005f, 0f, 1f, 1f),
-                    Vector4f(1.005f, 1f, 1f, 1f),
-                    Vector4f(1.005f, 1f, 0f, 1f)
+                    Vector4f(0.995f, 0f, 0f, 1f),
+                    Vector4f(0.995f, 0f, 1f, 1f),
+                    Vector4f(0.995f, 1f, 1f, 1f),
+                    Vector4f(0.995f, 1f, 0f, 1f)
                 )
                 normal = Vector3f(1f, 0f, 0f)
                 swapU = true; swapV = false
             }
             Direction.WEST -> {
-                // Face at x=0, quad slightly OUTSIDE at x=-0.005
-                // Camera at -X: z=0=left, z=1=right (standard), no swap
+                // Face at x=0, quad slightly INSIDE at x=0.005 (toward camera at +X)
                 vertices = arrayOf(
-                    Vector4f(-0.005f, 0f, 0f, 1f),
-                    Vector4f(-0.005f, 0f, 1f, 1f),
-                    Vector4f(-0.005f, 1f, 1f, 1f),
-                    Vector4f(-0.005f, 1f, 0f, 1f)
+                    Vector4f(0.005f, 0f, 0f, 1f),
+                    Vector4f(0.005f, 0f, 1f, 1f),
+                    Vector4f(0.005f, 1f, 1f, 1f),
+                    Vector4f(0.005f, 1f, 0f, 1f)
                 )
                 normal = Vector3f(-1f, 0f, 0f)
                 swapU = false; swapV = false
             }
             Direction.UP -> {
-                // Face at y=1, quad slightly OUTSIDE at y=1.005
-                // Camera at +Y (above): x=0=left, x=1=right, z=0=north(top), z=1=south(bottom)
-                // UP uses Z as vertical axis, so swap V to fix orientation
+                // Face at y=1, quad slightly INSIDE at y=0.995 (toward camera at -Y)
                 vertices = arrayOf(
-                    Vector4f(0f, 1.005f, 0f, 1f),
-                    Vector4f(1f, 1.005f, 0f, 1f),
-                    Vector4f(1f, 1.005f, 1f, 1f),
-                    Vector4f(0f, 1.005f, 1f, 1f)
+                    Vector4f(0f, 0.995f, 0f, 1f),
+                    Vector4f(1f, 0.995f, 0f, 1f),
+                    Vector4f(1f, 0.995f, 1f, 1f),
+                    Vector4f(0f, 0.995f, 1f, 1f)
                 )
                 normal = Vector3f(0f, 1f, 0f)
                 swapU = false; swapV = true
             }
             Direction.DOWN -> {
-                // Face at y=0, quad slightly OUTSIDE at y=-0.005
-                // Camera at -Y (below): x=0=left, x=1=right, z=0=north(top), z=1=south(bottom)
-                // From below: mirror U, and Z is vertical so swap V
+                // Face at y=0, quad slightly INSIDE at y=0.005 (toward camera at +Y)
                 vertices = arrayOf(
-                    Vector4f(0f, -0.005f, 0f, 1f),
-                    Vector4f(1f, -0.005f, 0f, 1f),
-                    Vector4f(1f, -0.005f, 1f, 1f),
-                    Vector4f(0f, -0.005f, 1f, 1f)
+                    Vector4f(0f, 0.005f, 0f, 1f),
+                    Vector4f(1f, 0.005f, 0f, 1f),
+                    Vector4f(1f, 0.005f, 1f, 1f),
+                    Vector4f(0f, 0.005f, 1f, 1f)
                 )
                 normal = Vector3f(0f, -1f, 0f)
                 swapU = true; swapV = true
