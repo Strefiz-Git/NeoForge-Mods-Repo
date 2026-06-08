@@ -34,7 +34,12 @@ object InputHandler {
             val sizeH = shape.height * 120
             LOGGER.debug("[InputHandler] creating browser {}x{} url={}", sizeW, sizeH, master.currentUrl)
             val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
-            ClientBrowserCache.put(master.blockPos, b)
+            if (b != null) {
+                ClientBrowserCache.put(master.blockPos, b)
+            } else {
+                LOGGER.error("[InputHandler] MCEF.createBrowser returned null!")
+                return
+            }
         }
         Minecraft.getInstance().mouseHandler.grabMouse()
     }

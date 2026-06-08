@@ -94,40 +94,95 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         uMin: Float, uMax: Float,
         vMin: Float, vMax: Float
     ) {
-        val vertices = arrayOf(
-            Vector4f(0f, 0f, 0.005f, 1f),
-            Vector4f(1f, 0f, 0.005f, 1f),
-            Vector4f(1f, 1f, 0.005f, 1f),
-            Vector4f(0f, 1f, 0.005f, 1f)
-        )
-        var normal = Vector3f(0f, 0f, 1f)
+        val vertices: Array<Vector4f>
+        val normal: Vector3f
+        val swapU: Boolean
+        val swapV: Boolean
 
         when (facing) {
-            Direction.SOUTH -> {
-                for (v in vertices) { v.x = 1f - v.x; v.z = 1f - 0.005f }
+            Direction.NORTH -> {
+                // Face at z=0, quad slightly OUTSIDE at z=-0.005
+                // Camera at -Z: x=0=left, x=1=right, y=0=bottom, y=1=top
+                vertices = arrayOf(
+                    Vector4f(0f, 0f, -0.005f, 1f),
+                    Vector4f(1f, 0f, -0.005f, 1f),
+                    Vector4f(1f, 1f, -0.005f, 1f),
+                    Vector4f(0f, 1f, -0.005f, 1f)
+                )
                 normal = Vector3f(0f, 0f, -1f)
+                swapU = false; swapV = false
+            }
+            Direction.SOUTH -> {
+                // Face at z=1, quad slightly OUTSIDE at z=1.005
+                // Camera at +Z: x=1=left, x=0=right (mirrored), so swap U
+                vertices = arrayOf(
+                    Vector4f(0f, 0f, 1.005f, 1f),
+                    Vector4f(1f, 0f, 1.005f, 1f),
+                    Vector4f(1f, 1f, 1.005f, 1f),
+                    Vector4f(0f, 1f, 1.005f, 1f)
+                )
+                normal = Vector3f(0f, 0f, 1f)
+                swapU = true; swapV = false
             }
             Direction.EAST -> {
-                for (v in vertices) { val tx = v.x; v.x = v.z; v.z = 1f - tx; v.z = 1f - 0.005f }
-                normal = Vector3f(-1f, 0f, 0f)
+                // Face at x=1, quad slightly OUTSIDE at x=1.005
+                // Camera at +X: z=1=left, z=0=right (mirrored), so swap U
+                vertices = arrayOf(
+                    Vector4f(1.005f, 0f, 0f, 1f),
+                    Vector4f(1.005f, 0f, 1f, 1f),
+                    Vector4f(1.005f, 1f, 1f, 1f),
+                    Vector4f(1.005f, 1f, 0f, 1f)
+                )
+                normal = Vector3f(1f, 0f, 0f)
+                swapU = true; swapV = false
             }
             Direction.WEST -> {
-                for (v in vertices) { val tz = v.z; v.z = v.x; v.x = tz; v.z = 0.005f }
-                normal = Vector3f(1f, 0f, 0f)
+                // Face at x=0, quad slightly OUTSIDE at x=-0.005
+                // Camera at -X: z=0=left, z=1=right (standard), no swap
+                vertices = arrayOf(
+                    Vector4f(-0.005f, 0f, 0f, 1f),
+                    Vector4f(-0.005f, 0f, 1f, 1f),
+                    Vector4f(-0.005f, 1f, 1f, 1f),
+                    Vector4f(-0.005f, 1f, 0f, 1f)
+                )
+                normal = Vector3f(-1f, 0f, 0f)
+                swapU = false; swapV = false
             }
             Direction.UP -> {
-                for (v in vertices) { val ty = v.y; v.y = v.z; v.z = 1f - ty; v.y = 1f - 0.005f }
-                normal = Vector3f(0f, -1f, 0f)
+                // Face at y=1, quad slightly OUTSIDE at y=1.005
+                // Camera at +Y (above): x=0=left, x=1=right, z=0=north(top), z=1=south(bottom)
+                // UP uses Z as vertical axis, so swap V to fix orientation
+                vertices = arrayOf(
+                    Vector4f(0f, 1.005f, 0f, 1f),
+                    Vector4f(1f, 1.005f, 0f, 1f),
+                    Vector4f(1f, 1.005f, 1f, 1f),
+                    Vector4f(0f, 1.005f, 1f, 1f)
+                )
+                normal = Vector3f(0f, 1f, 0f)
+                swapU = false; swapV = true
             }
             Direction.DOWN -> {
-                for (v in vertices) { val ty = v.y; v.y = v.z; v.z = ty; v.y = 0.005f }
-                normal = Vector3f(0f, 1f, 0f)
+                // Face at y=0, quad slightly OUTSIDE at y=-0.005
+                // Camera at -Y (below): x=0=left, x=1=right, z=0=north(top), z=1=south(bottom)
+                // From below: mirror U, and Z is vertical so swap V
+                vertices = arrayOf(
+                    Vector4f(0f, -0.005f, 0f, 1f),
+                    Vector4f(1f, -0.005f, 0f, 1f),
+                    Vector4f(1f, -0.005f, 1f, 1f),
+                    Vector4f(0f, -0.005f, 1f, 1f)
+                )
+                normal = Vector3f(0f, -1f, 0f)
+                swapU = true; swapV = true
             }
-            else -> {}
         }
 
+        val finalUMin = if (swapU) uMax else uMin
+        val finalUMax = if (swapU) uMin else uMax
+        val finalVMin = if (swapV) vMax else vMin
+        val finalVMax = if (swapV) vMin else vMax
+
         addQuad(buffer, poseStack, vertices[0], vertices[1], vertices[2], vertices[3],
-            uMin, uMax, vMin, vMax, normal)
+            finalUMin, finalUMax, finalVMin, finalVMax, normal)
     }
 
     private fun addQuad(

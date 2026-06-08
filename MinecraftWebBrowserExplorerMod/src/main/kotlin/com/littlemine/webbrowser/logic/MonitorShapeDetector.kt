@@ -19,7 +19,7 @@ data class MonitorShape(
 object MonitorShapeDetector {
     private val LOGGER: Logger = com.mojang.logging.LogUtils.getLogger()
 
-    private const val MIN_SIZE = 2
+    private const val MIN_SIZE = 1
     private const val MAX_WIDTH = 48
     private const val MAX_HEIGHT = 27
 
