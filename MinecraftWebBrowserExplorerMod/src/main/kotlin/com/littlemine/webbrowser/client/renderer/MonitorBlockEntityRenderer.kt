@@ -50,7 +50,7 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
 
         val state = entity.blockState
         val facing = state.getValue(MonitorBlock.FACING)
-        val shape = entity.shape
+        val shape = entity.shape ?: master.shape
         if (shape == null) {
             LOGGER.trace("[Renderer] no shape for {}", entity.blockPos)
             return

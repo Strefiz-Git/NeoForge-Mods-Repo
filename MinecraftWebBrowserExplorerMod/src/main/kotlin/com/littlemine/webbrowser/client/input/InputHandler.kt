@@ -24,7 +24,11 @@ object InputHandler {
 
     fun activate(be: MonitorBlockEntity) {
         val master = be.master()
-        val shape = master.shape
+        var shape = master.shape
+        if (shape == null && master.level?.isClientSide == true) {
+            master.recalculateClientShape()
+            shape = master.shape
+        }
         LOGGER.debug("[InputHandler] activate at {} master={} shape={}", be.blockPos, master.blockPos, shape)
         if (shape == null) return
         activeMonitor = be

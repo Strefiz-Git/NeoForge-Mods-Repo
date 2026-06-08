@@ -15,9 +15,9 @@ class UrlScreen(private val monitor: MonitorBlockEntity) : Screen(Component.tran
 
     override fun init() {
         urlField = EditBox(font, width / 2 - 100, height / 2 - 10, 200, 20, Component.literal("URL"))
+        urlField.setMaxLength(2048)
         urlField.value = monitor.currentUrl
         urlField.isFocused = true
-        urlField.setMaxLength(2048)
         addRenderableWidget(urlField)
         addRenderableWidget(
             net.minecraft.client.gui.components.Button.Builder(

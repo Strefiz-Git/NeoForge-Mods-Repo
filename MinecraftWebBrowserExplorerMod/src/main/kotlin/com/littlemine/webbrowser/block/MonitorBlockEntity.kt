@@ -131,6 +131,19 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         currentUrl = tag.getString("url")
         isActive = tag.getBoolean("active")
         if (tag.contains("master_pos")) masterPos = BlockPos.of(tag.getLong("master_pos"))
+        recalculateClientShape()
+    }
+
+    fun recalculateClientShape() {
+        if (level?.isClientSide != true || !isActive || shape != null) return
+        val detected = level?.let { MonitorShapeDetector.findRectangle(blockPos, it) }
+        if (detected != null) {
+            LOGGER.debug("[BE] recalculated shape on client: {}x{} master={}", detected.width, detected.height, detected.topLeft)
+            shape = detected
+            width = detected.width
+            height = detected.height
+            masterPos = detected.topLeft
+        }
     }
 
     override fun getUpdateTag(registries: HolderLookup.Provider): CompoundTag {
