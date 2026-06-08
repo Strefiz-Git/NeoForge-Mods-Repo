@@ -1,0 +1,23 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "pattern": [
+        " b ",
+        " r ",
+        " i "
+    ],
+    "key": {
+        "b": {
+            "item": "minecraft:copper_ingot"
+        },
+        "r": {
+            "item": "minecraft:redstone"
+        },
+        "i": {
+            "item": "minecraft:iron_ingot"
+        }
+    },
+    "result": {
+        "id": "webbrowser:monitor_command",
+        "count": 1
+    }
+}

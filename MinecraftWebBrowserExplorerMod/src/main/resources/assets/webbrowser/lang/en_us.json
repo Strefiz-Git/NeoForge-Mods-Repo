@@ -1,5 +1,7 @@
 {
     "itemGroup.webbrowser": "Web Browser",
     "block.webbrowser.monitor_block": "Monitor Block",
-    "item.webbrowser.monitor_block": "Monitor Block"
+    "item.webbrowser.monitor_block": "Monitor Block",
+    "item.webbrowser.monitor_command": "Monitor Command",
+    "message.webbrowser.need_command": "You need a Monitor Command to interact with this monitor!"
 }

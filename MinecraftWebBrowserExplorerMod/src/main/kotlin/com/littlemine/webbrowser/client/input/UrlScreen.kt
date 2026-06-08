@@ -2,6 +2,7 @@ package com.littlemine.webbrowser.client.input
 
 import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.block.MonitorBlockEntity
+import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.client.ClientBrowserCache
 import com.littlemine.webbrowser.network.MonitorUpdatePacket
 import net.minecraft.client.gui.components.EditBox
@@ -38,7 +39,11 @@ class UrlScreen(private val monitor: MonitorBlockEntity) : Screen(Component.tran
         if (browser == null) {
             val shape = monitor.shape
             if (shape != null) {
-                val b = MCEF.createBrowser(monitor.currentUrl, false, shape.width * 120, shape.height * 120)
+                val b = MCEF.createBrowser(
+                    monitor.currentUrl, false,
+                    shape.width * BrowserConstants.BLOCK_PIXEL_WIDTH,
+                    shape.height * BrowserConstants.BLOCK_PIXEL_HEIGHT
+                )
                 if (b != null) {
                     ClientBrowserCache.put(monitor.blockPos, b)
                     browser = b

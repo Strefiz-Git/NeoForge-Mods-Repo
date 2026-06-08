@@ -1,6 +1,5 @@
 package com.littlemine.webbrowser.block
 
-import com.littlemine.webbrowser.ClientBridge
 import com.littlemine.webbrowser.registry.BlockEntityRegistry
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -81,10 +80,8 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
     override fun useWithoutItem(state: BlockState, level: Level, pos: BlockPos, player: Player, hit: BlockHitResult): InteractionResult {
         val be = level.getBlockEntity(pos)
         if (be is MonitorBlockEntity && be.isActive) {
-            if (level.isClientSide) {
-                ClientBridge.onMonitorUse?.invoke(be, player, hit)
-            }
-            return InteractionResult.SUCCESS
+            LOGGER.debug("[MonitorBlock] useWithoutItem on active monitor {} - blocked (need command)", pos)
+            return InteractionResult.PASS
         }
         return InteractionResult.PASS
     }

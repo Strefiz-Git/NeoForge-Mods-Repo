@@ -11,18 +11,21 @@ class MCEFBrowserTextureShard(textureId: () -> Int) : RenderStateShard.EmptyText
     { }
 )
 
+private val ALWAYS_DEPTH = RenderStateShard.DepthTestStateShard("always", 519)
+
 @Suppress("INVISIBLE_REFERENCE")
 fun createMCEFRenderType(textureId: () -> Int): RenderType {
     val state = RenderType.CompositeState.builder()
         .setTextureState(MCEFBrowserTextureShard(textureId))
         .setShaderState(RenderStateShard.RENDERTYPE_ENTITY_CUTOUT_SHADER)
-        .setLightmapState(RenderStateShard.NO_LIGHTMAP)
-        .setOverlayState(RenderStateShard.NO_OVERLAY)
+        .setLightmapState(RenderStateShard.LIGHTMAP)
+        .setOverlayState(RenderStateShard.OVERLAY)
         .setCullState(RenderStateShard.NO_CULL)
+        .setDepthTestState(ALWAYS_DEPTH)
         .createCompositeState(false)
     return RenderType.create(
         "mcef_browser",
-        DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL,
+        DefaultVertexFormat.NEW_ENTITY,
         VertexFormat.Mode.QUADS,
         256,
         false,

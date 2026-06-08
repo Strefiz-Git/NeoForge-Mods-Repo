@@ -6,5 +6,7 @@ import net.minecraft.world.phys.BlockHitResult
 
 object ClientBridge {
     var onMonitorFormed: ((MonitorBlockEntity) -> Unit)? = null
-    var onMonitorUse: ((MonitorBlockEntity, Player, BlockHitResult) -> Unit)? = null
+    var onMonitorBreak: ((MonitorBlockEntity) -> Unit)? = null
+    var onMonitorCommandUse: ((MonitorBlockEntity) -> Unit)? = null
+    var onMonitorCommandShiftUse: ((MonitorBlockEntity) -> Unit)? = null
 }

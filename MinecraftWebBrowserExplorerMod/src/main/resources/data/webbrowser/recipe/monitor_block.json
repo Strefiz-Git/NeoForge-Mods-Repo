@@ -1,0 +1,29 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "pattern": [
+        "ibi",
+        "qgq",
+        "ini"
+    ],
+    "key": {
+        "i": {
+            "item": "minecraft:iron_ingot"
+        },
+        "b": {
+            "item": "minecraft:copper_ingot"
+        },
+        "q": {
+            "item": "minecraft:quartz"
+        },
+        "g": {
+            "item": "minecraft:glass_pane"
+        },
+        "n": {
+            "item": "minecraft:iron_nugget"
+        }
+    },
+    "result": {
+        "id": "webbrowser:monitor_block",
+        "count": 4
+    }
+}

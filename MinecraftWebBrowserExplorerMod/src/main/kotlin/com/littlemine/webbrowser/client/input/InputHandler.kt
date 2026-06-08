@@ -2,6 +2,7 @@ package com.littlemine.webbrowser.client.input
 
 import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.block.MonitorBlockEntity
+import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.client.ClientBrowserCache
 import com.littlemine.webbrowser.network.MonitorInputPacket
 import com.littlemine.webbrowser.network.MonitorUpdatePacket
@@ -23,7 +24,10 @@ object InputHandler {
     fun isInputActive(): Boolean = activeMonitor != null
 
     fun activate(be: MonitorBlockEntity) {
-        if (isInputActive()) return // prevent spam from held right-click
+        if (isInputActive()) {
+            if (activeMonitor?.master()?.blockPos == be.master().blockPos) return
+            deactivate()
+        }
         val master = be.master()
         var shape = master.shape
         if (shape == null && master.level?.isClientSide == true) {
@@ -35,8 +39,8 @@ object InputHandler {
         activeMonitor = be
         val browser = ClientBrowserCache.get(master.blockPos)
         if (browser == null) {
-            val sizeW = shape.width * 120
-            val sizeH = shape.height * 120
+            val sizeW = shape.width * BrowserConstants.BLOCK_PIXEL_WIDTH
+            val sizeH = shape.height * BrowserConstants.BLOCK_PIXEL_HEIGHT
             LOGGER.debug("[InputHandler] creating browser {}x{} url={}", sizeW, sizeH, master.currentUrl)
             val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
             if (b != null) {
@@ -51,11 +55,34 @@ object InputHandler {
 
     fun deactivate() {
         LOGGER.debug("[InputHandler] deactivate")
-        activeMonitor?.let {
-            ClientBrowserCache.remove(it.master().blockPos)
-        }
         activeMonitor = null
         Minecraft.getInstance().mouseHandler.releaseMouse()
+    }
+
+    fun syncToMonitor(be: MonitorBlockEntity) {
+        LOGGER.debug("[InputHandler] syncToMonitor at {}", be.blockPos)
+        val master = be.master()
+        var shape = master.shape
+        if (shape == null && master.level?.isClientSide == true) {
+            master.recalculateClientShape()
+            shape = master.shape
+        }
+        if (shape == null) return
+        val browser = ClientBrowserCache.get(master.blockPos)
+        if (browser == null) {
+            val sizeW = shape.width * BrowserConstants.BLOCK_PIXEL_WIDTH
+            val sizeH = shape.height * BrowserConstants.BLOCK_PIXEL_HEIGHT
+            LOGGER.debug("[InputHandler] creating browser {}x{} url={}", sizeW, sizeH, master.currentUrl)
+            val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
+            if (b != null) {
+                ClientBrowserCache.put(master.blockPos, b)
+            } else {
+                LOGGER.error("[InputHandler] MCEF.createBrowser returned null!")
+                return
+            }
+        }
+        activeMonitor = be
+        Minecraft.getInstance().mouseHandler.grabMouse()
     }
 
     fun openUrlScreen(be: MonitorBlockEntity) {
@@ -139,8 +166,8 @@ object InputHandler {
         val dy = hit.location.y - pos.y
         val dz = hit.location.z - pos.z
 
-        val blockPixelWidth = 120
-        val blockPixelHeight = 120
+        val blockPixelWidth = BrowserConstants.BLOCK_PIXEL_WIDTH
+        val blockPixelHeight = BrowserConstants.BLOCK_PIXEL_HEIGHT
 
         val browserX: Double
         val browserY: Double

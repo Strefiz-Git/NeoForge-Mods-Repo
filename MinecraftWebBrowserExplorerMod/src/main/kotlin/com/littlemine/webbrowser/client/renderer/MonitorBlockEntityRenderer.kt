@@ -2,9 +2,14 @@ package com.littlemine.webbrowser.client.renderer
 
 import com.littlemine.webbrowser.block.MonitorBlock
 import com.littlemine.webbrowser.block.MonitorBlockEntity
+import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.client.ClientBrowserCache
+import com.mojang.blaze3d.vertex.BufferBuilder
+import com.mojang.blaze3d.vertex.BufferUploader
+import com.mojang.blaze3d.vertex.ByteBufferBuilder
+import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.VertexConsumer
+import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
@@ -22,12 +27,18 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         private val renderTypeCache = mutableMapOf<Int, RenderType>()
 
         fun clearRenderTypeCache() {
+            val count = renderTypeCache.size
             renderTypeCache.clear()
+            // LOGGER is not accessible in companion, use the one from the class
         }
 
         private fun getOrCreateRenderType(textureId: Int): RenderType =
             renderTypeCache.getOrPut(textureId) { createMCEFRenderType { textureId } }
     }
+
+    override fun shouldRenderOffScreen(entity: MonitorBlockEntity): Boolean = true
+
+    override fun getViewDistance(): Int = BrowserConstants.VIEW_DISTANCE_BLOCKS
 
     override fun render(
         entity: MonitorBlockEntity,
@@ -44,7 +55,7 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val master = entity.master()
         val browser = ClientBrowserCache.get(master.blockPos)
         if (browser == null) {
-            LOGGER.trace("[Renderer] no browser for master {}", master.blockPos)
+            LOGGER.trace("[Renderer] no browser for master {} at {}", master.blockPos, entity.blockPos)
             return
         }
 
@@ -78,26 +89,15 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val vMax = (row + 1).toFloat() / shape.height
 
         val textureId = browser.renderer.textureID
-        if (textureId == 0) {
-            LOGGER.debug("[Renderer] {} texture ID is 0 (browser not ready yet)", entity.blockPos)
-            return
-        }
-        LOGGER.trace("[Renderer] {} col={} row={} uv=[{},{}]x[{},{}] texId={}",
+        LOGGER.trace("[Renderer] {} col={} row={} uv=[{},{},{},{}] texId={}",
             entity.blockPos, col, row, uMin, uMax, vMin, vMax, textureId)
-        val buffer = bufferSource.getBuffer(getOrCreateRenderType(textureId))
 
-        poseStack.pushPose()
-        renderScreenFace(poseStack, buffer, facing, uMin, uMax, vMin, vMax)
-        poseStack.popPose()
-    }
+        val renderType = getOrCreateRenderType(textureId)
+        renderType.setupRenderState()
 
-    private fun renderScreenFace(
-        poseStack: PoseStack,
-        buffer: VertexConsumer,
-        facing: Direction,
-        uMin: Float, uMax: Float,
-        vMin: Float, vMax: Float
-    ) {
+        val byteBuffer = ByteBufferBuilder(256)
+        val builder = BufferBuilder(byteBuffer, VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY)
+
         val vertices: Array<Vector4f>
         val normal: Vector3f
         val swapU: Boolean
@@ -105,67 +105,61 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
 
         when (facing) {
             Direction.NORTH -> {
-                // Face at z=0, quad slightly INSIDE at z=0.005 (toward camera at +Z)
                 vertices = arrayOf(
-                    Vector4f(0f, 0f, 0.005f, 1f),
-                    Vector4f(1f, 0f, 0.005f, 1f),
-                    Vector4f(1f, 1f, 0.005f, 1f),
-                    Vector4f(0f, 1f, 0.005f, 1f)
+                    Vector4f(0f, 0f, 0f, 1f),
+                    Vector4f(1f, 0f, 0f, 1f),
+                    Vector4f(1f, 1f, 0f, 1f),
+                    Vector4f(0f, 1f, 0f, 1f)
                 )
                 normal = Vector3f(0f, 0f, -1f)
                 swapU = false; swapV = false
             }
             Direction.SOUTH -> {
-                // Face at z=1, quad slightly INSIDE at z=0.995 (toward camera at -Z)
                 vertices = arrayOf(
-                    Vector4f(0f, 0f, 0.995f, 1f),
-                    Vector4f(1f, 0f, 0.995f, 1f),
-                    Vector4f(1f, 1f, 0.995f, 1f),
-                    Vector4f(0f, 1f, 0.995f, 1f)
+                    Vector4f(0f, 0f, 1f, 1f),
+                    Vector4f(1f, 0f, 1f, 1f),
+                    Vector4f(1f, 1f, 1f, 1f),
+                    Vector4f(0f, 1f, 1f, 1f)
                 )
                 normal = Vector3f(0f, 0f, 1f)
                 swapU = true; swapV = false
             }
             Direction.EAST -> {
-                // Face at x=1, quad slightly INSIDE at x=0.995 (toward camera at -X)
                 vertices = arrayOf(
-                    Vector4f(0.995f, 0f, 0f, 1f),
-                    Vector4f(0.995f, 0f, 1f, 1f),
-                    Vector4f(0.995f, 1f, 1f, 1f),
-                    Vector4f(0.995f, 1f, 0f, 1f)
+                    Vector4f(1f, 0f, 0f, 1f),
+                    Vector4f(1f, 0f, 1f, 1f),
+                    Vector4f(1f, 1f, 1f, 1f),
+                    Vector4f(1f, 1f, 0f, 1f)
                 )
                 normal = Vector3f(1f, 0f, 0f)
                 swapU = true; swapV = false
             }
             Direction.WEST -> {
-                // Face at x=0, quad slightly INSIDE at x=0.005 (toward camera at +X)
                 vertices = arrayOf(
-                    Vector4f(0.005f, 0f, 0f, 1f),
-                    Vector4f(0.005f, 0f, 1f, 1f),
-                    Vector4f(0.005f, 1f, 1f, 1f),
-                    Vector4f(0.005f, 1f, 0f, 1f)
+                    Vector4f(0f, 0f, 0f, 1f),
+                    Vector4f(0f, 0f, 1f, 1f),
+                    Vector4f(0f, 1f, 1f, 1f),
+                    Vector4f(0f, 1f, 0f, 1f)
                 )
                 normal = Vector3f(-1f, 0f, 0f)
                 swapU = false; swapV = false
             }
             Direction.UP -> {
-                // Face at y=1, quad slightly INSIDE at y=0.995 (toward camera at -Y)
                 vertices = arrayOf(
-                    Vector4f(0f, 0.995f, 0f, 1f),
-                    Vector4f(1f, 0.995f, 0f, 1f),
-                    Vector4f(1f, 0.995f, 1f, 1f),
-                    Vector4f(0f, 0.995f, 1f, 1f)
+                    Vector4f(0f, 1f, 0f, 1f),
+                    Vector4f(1f, 1f, 0f, 1f),
+                    Vector4f(1f, 1f, 1f, 1f),
+                    Vector4f(0f, 1f, 1f, 1f)
                 )
                 normal = Vector3f(0f, 1f, 0f)
                 swapU = false; swapV = true
             }
             Direction.DOWN -> {
-                // Face at y=0, quad slightly INSIDE at y=0.005 (toward camera at +Y)
                 vertices = arrayOf(
-                    Vector4f(0f, 0.005f, 0f, 1f),
-                    Vector4f(1f, 0.005f, 0f, 1f),
-                    Vector4f(1f, 0.005f, 1f, 1f),
-                    Vector4f(0f, 0.005f, 1f, 1f)
+                    Vector4f(0f, 0f, 0f, 1f),
+                    Vector4f(1f, 0f, 0f, 1f),
+                    Vector4f(1f, 0f, 1f, 1f),
+                    Vector4f(0f, 0f, 1f, 1f)
                 )
                 normal = Vector3f(0f, -1f, 0f)
                 swapU = true; swapV = true
@@ -177,34 +171,28 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val finalVMin = if (swapV) vMax else vMin
         val finalVMax = if (swapV) vMin else vMax
 
-        addQuad(buffer, poseStack, vertices[0], vertices[1], vertices[2], vertices[3],
-            finalUMin, finalUMax, finalVMin, finalVMax, normal)
-    }
-
-    private fun addQuad(
-        buffer: VertexConsumer, poseStack: PoseStack,
-        v0: Vector4f, v1: Vector4f, v2: Vector4f, v3: Vector4f,
-        uMin: Float, uMax: Float, vMin: Float, vMax: Float,
-        normal: Vector3f
-    ) {
         val pose = poseStack.last()
         val matrix = pose.pose()
         val n = Vector3f(normal)
         pose.normal().transform(n)
 
-        addVertex(buffer, matrix, v0, uMin, vMax, n)
-        addVertex(buffer, matrix, v1, uMax, vMax, n)
-        addVertex(buffer, matrix, v2, uMax, vMin, n)
-        addVertex(buffer, matrix, v3, uMin, vMin, n)
+        drawVertex(builder, matrix, vertices[0], finalUMin, finalVMax, n)
+        drawVertex(builder, matrix, vertices[1], finalUMax, finalVMax, n)
+        drawVertex(builder, matrix, vertices[2], finalUMax, finalVMin, n)
+        drawVertex(builder, matrix, vertices[3], finalUMin, finalVMin, n)
+
+        BufferUploader.drawWithShader(builder.buildOrThrow())
+
+        renderType.clearRenderState()
     }
 
-    private fun addVertex(
-        buffer: VertexConsumer, matrix: Matrix4f,
-        vertex: Vector4f, u: Float, v: Float, normal: Vector3f
+    private fun drawVertex(
+        builder: BufferBuilder, matrix: Matrix4f,
+        localVertex: Vector4f, u: Float, v: Float, normal: Vector3f
     ) {
-        val t = Vector4f(vertex).mul(matrix)
-        buffer.addVertex(t.x, t.y, t.z)
-            .setColor(1f, 1f, 1f, 1f)
+        val worldPos = Vector4f(localVertex).mul(matrix)
+        builder.addVertex(worldPos.x, worldPos.y, worldPos.z)
+            .setColor(-1)
             .setUv(u, v)
             .setOverlay(OverlayTexture.NO_OVERLAY)
             .setLight(15728880)

@@ -17,6 +17,7 @@ object CreativeTabRegistry {
             .icon { ItemStack(ItemRegistry.MONITOR_BLOCK_ITEM.get()) }
             .displayItems { params, output ->
                 output.accept(ItemRegistry.MONITOR_BLOCK_ITEM.get())
+                output.accept(ItemRegistry.MONITOR_COMMAND_ITEM.get())
             }
             .build()
     }

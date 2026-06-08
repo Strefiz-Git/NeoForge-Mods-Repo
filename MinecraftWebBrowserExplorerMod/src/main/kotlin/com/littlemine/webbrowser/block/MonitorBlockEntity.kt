@@ -34,7 +34,12 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     fun invalidateMonitor() {
         if (!isActive) return
         val s = shape ?: return
+        LOGGER.debug("[BE] invalidateMonitor at {} shape={}", blockPos, s)
         isActive = false
+
+        val oldMasterPos = masterPos
+        val wasClient = level?.isClientSide == true
+
         for (row in 0 until s.height) {
             for (col in 0 until s.width) {
                 val p = s.topLeft.offset(
@@ -61,6 +66,15 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         masterPos = blockPos
         shape = null
         setChanged()
+
+        if (wasClient) {
+            val masterBE = level?.getBlockEntity(oldMasterPos)
+            if (masterBE is MonitorBlockEntity) {
+                ClientBridge.onMonitorBreak?.invoke(masterBE)
+            } else {
+                ClientBridge.onMonitorBreak?.invoke(this)
+            }
+        }
     }
 
     fun validateNeighbors() {
@@ -73,11 +87,15 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     fun tryFormMonitor() {
         val level = level ?: return
         val detected = MonitorShapeDetector.findRectangle(blockPos, level)
-        LOGGER.debug("[BE] tryFormMonitor at {} detected={}", blockPos, detected)
+        LOGGER.debug("[BE] tryFormMonitor at {} detected={} (was active={} oldShape={})",
+            blockPos, detected, isActive, shape)
         if (detected == null) return
         val facing = detected.facing
         val rightDir = detected.rightDir
         val downDir = detected.downDir
+
+        val oldMasterPos = if (isActive && masterPos != blockPos) masterPos else null
+        val wasResized = shape != null && (shape!!.width != detected.width || shape!!.height != detected.height)
 
         shape = detected
         width = detected.width
@@ -107,10 +125,18 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                 }
             }
         }
-        LOGGER.debug("[BE] tryFormMonitor SUCCESS: {}x{} active at {}", width, height, masterPos)
+        LOGGER.debug("[BE] tryFormMonitor SUCCESS: {}x{} active at master={} resized={}",
+            width, height, masterPos, wasResized)
         setChanged()
 
         if (level.isClientSide) {
+            val oldPos = oldMasterPos
+            if (oldPos != null && oldPos != detected.topLeft) {
+                val oldMasterBE = level.getBlockEntity(oldPos)
+                if (oldMasterBE is MonitorBlockEntity) {
+                    ClientBridge.onMonitorBreak?.invoke(oldMasterBE)
+                }
+            }
             ClientBridge.onMonitorFormed?.invoke(this)
         }
     }
@@ -155,5 +181,4 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     override fun getUpdatePacket(): Packet<ClientGamePacketListener>? {
         return ClientboundBlockEntityDataPacket.create(this)
     }
-
 }

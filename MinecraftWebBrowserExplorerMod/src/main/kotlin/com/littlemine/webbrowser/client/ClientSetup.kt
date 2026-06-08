@@ -19,29 +19,52 @@ import net.neoforged.neoforge.event.level.LevelEvent
 
 @EventBusSubscriber(bus = EventBusSubscriber.Bus.GAME, value = [Dist.CLIENT])
 object ClientGameEvents {
+    private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
 
     init {
         ClientBridge.onMonitorFormed = { be ->
             val master = be.master()
             val shape = master.shape
             if (shape != null) {
-                val browser = ClientBrowserCache.get(master.blockPos)
-                if (browser == null) {
-                    val sizeW = shape.width * 120
-                    val sizeH = shape.height * 120
-                    val b = MCEF.createBrowser(master.currentUrl, false, sizeW, sizeH)
-                    if (b != null) {
-                        ClientBrowserCache.put(master.blockPos, b)
-                    }
+                val targetW = shape.width * BrowserConstants.BLOCK_PIXEL_WIDTH
+                val targetH = shape.height * BrowserConstants.BLOCK_PIXEL_HEIGHT
+                LOGGER.debug("[ClientGameEvents] onMonitorFormed at {} shape={}x{} -> browser target {}x{}",
+                    master.blockPos, shape.width, shape.height, targetW, targetH)
+
+                val existing = ClientBrowserCache.get(master.blockPos)
+                if (existing != null) {
+                    LOGGER.debug("[ClientGameEvents] browser already exists at {}, closing and recreating", master.blockPos)
+                    ClientBrowserCache.remove(master.blockPos)
                 }
+
+                LOGGER.debug("[ClientGameEvents] creating browser {}x{} url={}", targetW, targetH, master.currentUrl)
+                val b = MCEF.createBrowser(master.currentUrl, false, targetW, targetH)
+                if (b != null) {
+                    ClientBrowserCache.put(master.blockPos, b)
+                    LOGGER.debug("[ClientGameEvents] browser created, textureID={}", b.renderer.textureID)
+                } else {
+                    LOGGER.error("[ClientGameEvents] MCEF.createBrowser returned null!")
+                }
+            } else {
+                LOGGER.warn("[ClientGameEvents] onMonitorFormed - no shape for master {}", master.blockPos)
             }
         }
-        ClientBridge.onMonitorUse = { be, player, _ ->
-            if (player.isShiftKeyDown) {
-                InputHandler.openUrlScreen(be.master())
-            } else {
-                InputHandler.activate(be.master())
-            }
+
+        ClientBridge.onMonitorBreak = { be ->
+            val master = be.master()
+            LOGGER.debug("[ClientGameEvents] onMonitorBreak at {} master={}", be.blockPos, master.blockPos)
+            ClientBrowserCache.remove(master.blockPos)
+            clearRenderTypeCache()
+        }
+
+        ClientBridge.onMonitorCommandUse = { be ->
+            LOGGER.debug("[ClientGameEvents] onMonitorCommandUse at {}", be.blockPos)
+            InputHandler.syncToMonitor(be)
+        }
+
+        ClientBridge.onMonitorCommandShiftUse = { be ->
+            LOGGER.debug("[ClientGameEvents] onMonitorCommandShiftUse at {}", be.blockPos)
+            InputHandler.openUrlScreen(be)
         }
     }
 
@@ -49,6 +72,7 @@ object ClientGameEvents {
     fun onChunkUnload(event: ChunkEvent.Unload) {
         val chunk = event.chunk
         if (chunk !is net.minecraft.world.level.chunk.LevelChunk) return
+        LOGGER.trace("[ClientGameEvents] chunk unload at {}", chunk.pos)
         for (be in chunk.blockEntities.values) {
             if (be is MonitorBlockEntity && be.isMaster) {
                 ClientBrowserCache.remove(be.blockPos)
@@ -58,6 +82,7 @@ object ClientGameEvents {
 
     @SubscribeEvent
     fun onLevelUnload(event: LevelEvent.Unload) {
+        LOGGER.debug("[ClientGameEvents] level unload - clearing all")
         ClientBrowserCache.clear()
         clearRenderTypeCache()
         InputHandler.deactivate()
@@ -69,6 +94,7 @@ object ClientGameEvents {
 
         val mc = Minecraft.getInstance()
         if (InputHandler.isInputActive() && mc.screen != null) {
+            LOGGER.trace("[ClientGameEvents] closing unexpected screen while input active")
             mc.setScreen(null)
         }
     }
@@ -76,6 +102,7 @@ object ClientGameEvents {
     @SubscribeEvent
     fun onMouseClick(event: InputEvent.MouseButton.Pre) {
         if (InputHandler.isInputActive()) {
+            LOGGER.trace("[ClientGameEvents] mouse click {} action={}", event.button, event.action)
             InputHandler.onMouseClick(event.button, event.action, event.modifiers)
             event.setCanceled(true)
         }
@@ -85,6 +112,7 @@ object ClientGameEvents {
     fun onKeyPress(event: InputEvent.Key) {
         if (InputHandler.isInputActive()) {
             if (event.key == 256) {
+                LOGGER.debug("[ClientGameEvents] ESC pressed - deactivating input")
                 InputHandler.deactivate()
                 return
             }
