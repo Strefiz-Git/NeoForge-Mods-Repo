@@ -4,7 +4,17 @@
 
 ---
 
-## Fase 0: Verificação de Funcionalidade
+## Fase 0: Migração para Inglês (antes de tudo)
+
+- `PLANO_CORRECOES.md` — já está em português, manter como está (docs internos)
+- `PLANO_MELHORIAS.md` — já está em português, manter como está
+- `CONTINUAR.txt` — conversa de desenvolvimento, manter como está
+- **Código:** Logs (`LOGGER.info`) ficam em inglês (já estão)
+- **Lang files:** `en_us.json` e `pt_pt.json` — manter ambos (já estão correctos)
+- **Variáveis, comentários, commits** — manter inglês (já estão)
+- **Conclusão:** O mod já está essencialmente em inglês no código. Documentos de planeamento em PT mantêm-se.
+
+## Fase 0.1: Verificação de Funcionalidade
 
 ### 0.1 Testar fluxo completo
 1. Colocar blocos do monitor (mín 6x3)
