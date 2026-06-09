@@ -193,7 +193,7 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         entity: MonitorBlockEntity? = null
     ) {
         val worldPos = Vector4f(localVertex).mul(matrix)
-        val b = ((entity?.master()?.brightness ?: 100).coerceIn(1, 100) * 255 / 100).coerceIn(0, 255)
+        val b = ((entity?.master()?.brightness ?: 100).coerceIn(1, 500) * 255 / 500).coerceIn(0, 255)
         val color = (0xFF shl 24) or (b shl 16) or (b shl 8) or b
         builder.addVertex(worldPos.x, worldPos.y, worldPos.z)
             .setColor(color)

@@ -25,7 +25,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     var pixelsPerBlock: Int = 120
     var audioMode: Int = 0 // 0=player, 1=center_block
     var volume: Int = 100 // 0-100
-    var brightness: Int = 100 // 0-100 (screen brightness)
+    var brightness: Int = 100 // 0-500 (screen brightness)
     var isActive: Boolean = false
     var masterPos: BlockPos = blockPos
     var shape: MonitorShape? = null

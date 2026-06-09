@@ -79,7 +79,7 @@ object MonitorBrightnessHandler : IPayloadHandler<MonitorBrightnessPacket> {
         val level = ctx.player().level()
         val be = level.getBlockEntity(pos)
         if (be is MonitorBlockEntity) {
-            be.brightness = packet.brightness.coerceIn(0, 100)
+            be.brightness = packet.brightness.coerceIn(0, BrowserConstants.MAX_BRIGHTNESS)
             be.setChanged()
             level.sendBlockUpdated(pos, be.blockState, be.blockState, 3)
         }

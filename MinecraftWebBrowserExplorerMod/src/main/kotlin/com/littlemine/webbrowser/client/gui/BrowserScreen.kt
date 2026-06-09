@@ -179,7 +179,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     private fun onApplyBrightness() {
         val bri = brightnessField.value.toIntOrNull() ?: return
-        val clampedBri = bri.coerceIn(0, 100)
+        val clampedBri = bri.coerceIn(0, BrowserConstants.MAX_BRIGHTNESS)
         brightnessField.value = clampedBri.toString()
         monitor.brightness = clampedBri
         PacketDistributor.sendToServer(MonitorBrightnessPacket(
@@ -211,7 +211,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         guiGraphics.drawString(font, Component.literal("URL:"), rX, 28, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Pixels/Block:"), rX, 98, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Volume (0-300):"), rX, 208, 0xFFFFFF)
-        guiGraphics.drawString(font, Component.literal("Brightness (0-100):"), rX, 273, 0xFFFFFF)
+        guiGraphics.drawString(font, Component.literal("Brightness (0-500):"), rX, 273, 0xFFFFFF)
 
         if (browserFocused) {
             guiGraphics.drawString(font, Component.literal("Browser mode - Press Tab for URL"), 10, height - 20, 0x888888)
@@ -332,7 +332,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         RenderSystem.disableDepthTest()
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
-        val bri = monitor.brightness.coerceIn(1, 100) / 100f
+        val bri = monitor.brightness.coerceIn(1, BrowserConstants.MAX_BRIGHTNESS) / 100f
         RenderSystem.setShaderColor(bri, bri, bri, 1f)
         RenderSystem.setShaderTexture(0, texId)
         RenderSystem.setShader(GameRenderer::getPositionTexShader)

@@ -7,4 +7,5 @@ object BrowserConstants {
     const val MIN_BLOCK_PIXELS = 4
     const val VIEW_DISTANCE_CHUNKS = 6
     const val VIEW_DISTANCE_BLOCKS = VIEW_DISTANCE_CHUNKS * 16
+    const val MAX_BRIGHTNESS = 500
 }
