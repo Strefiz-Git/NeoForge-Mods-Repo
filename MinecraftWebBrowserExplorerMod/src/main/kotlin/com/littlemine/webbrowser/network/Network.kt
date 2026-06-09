@@ -35,6 +35,26 @@ object Network {
             MonitorResolutionPacket.STREAM_CODEC,
             MonitorResolutionHandler
         )
+
+        registrar.playToServer(
+            MonitorAudioPacket.TYPE,
+            MonitorAudioPacket.STREAM_CODEC,
+            MonitorAudioHandler
+        )
+    }
+}
+
+object MonitorAudioHandler : IPayloadHandler<MonitorAudioPacket> {
+    override fun handle(packet: MonitorAudioPacket, ctx: IPayloadContext) {
+        val pos = BlockPos(packet.posX, packet.posY, packet.posZ)
+        val level = ctx.player().level()
+        val be = level.getBlockEntity(pos)
+        if (be is MonitorBlockEntity) {
+            be.audioMode = packet.audioMode.coerceIn(0, 1)
+            be.volume = packet.volume.coerceIn(0, 100)
+            be.setChanged()
+            level.sendBlockUpdated(pos, be.blockState, be.blockState, 3)
+        }
     }
 }
 

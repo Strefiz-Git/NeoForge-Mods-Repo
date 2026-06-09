@@ -4,6 +4,7 @@ import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.client.ClientBrowserCache
 import com.littlemine.webbrowser.client.input.InputHandler
+import com.littlemine.webbrowser.network.MonitorAudioPacket
 import com.littlemine.webbrowser.network.MonitorResolutionPacket
 import com.littlemine.webbrowser.network.MonitorUpdatePacket
 import com.mojang.blaze3d.systems.RenderSystem
@@ -27,9 +28,13 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     private lateinit var pixelsField: EditBox
     private lateinit var previewWField: EditBox
     private lateinit var previewHField: EditBox
+    private lateinit var volumeField: EditBox
+    private var audioMode: Int = monitor.audioMode
     private var browserFocused: Boolean = false
     private var lastBrowserMouseX: Double = 0.0
     private var lastBrowserMouseY: Double = 0.0
+    private var lastScreenMouseX: Double = 0.0
+    private var lastScreenMouseY: Double = 0.0
 
     private val margin: Int = 10
 
@@ -51,6 +56,18 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
             monitor.blockPos, monitor.isActive, monitor.shape, monitor.currentUrl, monitor.pixelsPerBlock)
         previewW = 0
         previewH = 0
+
+        if (ClientBrowserCache.get(monitor.blockPos) == null) {
+            val shape = monitor.shape
+            if (shape != null) {
+                val targetW = shape.width * monitor.pixelsPerBlock
+                val targetH = shape.height * monitor.pixelsPerBlock
+                LOGGER.info("[BrowserScreen] creating browser {}x{} url={}", targetW, targetH, monitor.currentUrl)
+                ClientBrowserCache.recreate(monitor.blockPos, targetW, targetH, monitor.currentUrl)
+            } else {
+                LOGGER.warn("[BrowserScreen] no browser in cache and shape is null - cannot create browser yet")
+            }
+        }
 
         urlField = EditBox(font, rX, 40, rW, 20, Component.literal("URL"))
         urlField.setMaxLength(2048)
@@ -88,6 +105,24 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         addRenderableWidget(
             Button.Builder(Component.literal("Apply Preview"), { onApplyPreviewSize() })
                 .bounds(rX, 245, rW, 20)
+                .build()
+        )
+
+        val audioLabel = if (audioMode == 0) "Audio: Player" else "Audio: Center Block"
+        addRenderableWidget(
+            Button.Builder(Component.literal(audioLabel), { onCycleAudio() })
+                .bounds(rX, 280, rW, 20)
+                .build()
+        )
+
+        volumeField = EditBox(font, rX, 320, rW, 20, Component.literal("Volume"))
+        volumeField.value = monitor.volume.toString()
+        volumeField.setFilter { s -> s.all { it.isDigit() } || s.isEmpty() }
+        addRenderableWidget(volumeField)
+
+        addRenderableWidget(
+            Button.Builder(Component.literal("Apply Audio"), { onApplyAudio() })
+                .bounds(rX, 345, rW, 20)
                 .build()
         )
     }
@@ -132,18 +167,87 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         }
     }
 
+    private fun onCycleAudio() {
+        audioMode = if (audioMode == 0) 1 else 0
+        rebuildWidgets()
+    }
+
+    private fun onApplyAudio() {
+        val vol = volumeField.value.toIntOrNull() ?: return
+        val clampedVol = vol.coerceIn(0, 100)
+        volumeField.value = clampedVol.toString()
+        monitor.audioMode = audioMode
+        monitor.volume = clampedVol
+        PacketDistributor.sendToServer(MonitorAudioPacket(
+            monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z, audioMode, clampedVol
+        ))
+    }
+
     override fun render(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
         super.render(guiGraphics, mouseX, mouseY, partialTick)
 
         renderBrowserPreview(guiGraphics)
+        renderCursor(guiGraphics)
 
         guiGraphics.drawString(font, Component.literal("URL:"), rX, 28, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Pixels/Block:"), rX, 98, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Preview W:"), rX, 168, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Preview H:"), rX, 208, 0xFFFFFF)
+        guiGraphics.drawString(font, Component.literal("Volume (0-100):"), rX, 308, 0xFFFFFF)
 
         if (browserFocused) {
             guiGraphics.drawString(font, Component.literal("Browser mode - Press Tab for URL"), 10, height - 20, 0x888888)
+        }
+    }
+
+    private fun renderCursor(guiGraphics: GuiGraphics) {
+        if (!browserFocused) return
+        val area = getScaledPreviewArea() ?: return
+        val (drawX, drawY, drawW, drawH) = area
+        val cx = lastScreenMouseX.coerceIn(drawX.toDouble(), drawX + drawW.toDouble())
+        val cy = lastScreenMouseY.coerceIn(drawY.toDouble(), drawY + drawH.toDouble())
+        val ix = cx.toInt()
+        val iy = cy.toInt()
+        val col = 0xFFFFFFFF.toInt()
+        val outline = 0xFF000000.toInt()
+
+        // Simple arrow cursor shape (7x9 px)
+        // Outline pass (offset by ±1)
+        for (ox in -1..1) {
+            for (oy in -1..1) {
+                if (ox == 0 && oy == 0) continue
+                drawArrowPixels(guiGraphics, ix + ox, iy + oy, outline)
+            }
+        }
+        // Fill pass
+        drawArrowPixels(guiGraphics, ix, iy, col)
+    }
+
+    private fun drawArrowPixels(guiGraphics: GuiGraphics, ox: Int, oy: Int, color: Int) {
+        val pixels = listOf(
+            0 to 0, // tip
+            0 to 1, 1 to 1,
+            0 to 2, 2 to 2,
+            0 to 3, 3 to 3,
+            0 to 4, 4 to 4,
+            0 to 5, 5 to 5,
+            0 to 6, 6 to 6,
+            0 to 7,      7 to 7,
+            0 to 8,      7 to 8,
+                1 to 7, 1 to 8,
+                    2 to 7, 2 to 8,
+        )
+        // Arrow head + shaft: tip at (0,0), extends right and down
+        // Row 0: tip (0,0)
+        // Row 1: shaft (0,1) + wing (1,1)
+        // Row 2: shaft (0,2) + wing (2,2)
+        // Row 3-6: shaft (0,3..6) + wing (3..6, 3..6)
+        // Row 7: shaft (0,7) + wing (7,7) + bottom bar (1..2,7)
+        // Row 8: shaft (0,8) + wing (7,8) + bottom bar (1..2,8)
+        // Actually simpler: just draw a simple pointer
+        // Let me just use a simple 5x7 cross cursor
+        for ((dx, dy) in pixels) {
+            guiGraphics.fill(ox + dx, oy + dy, ox + dx + 1, oy + dy + 1, color)
         }
     }
 
@@ -244,6 +348,8 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
             browserFocused = true
             urlField.isFocused = false
             pixelsField.isFocused = false
+            lastScreenMouseX = mx
+            lastScreenMouseY = my
             val (bx, by) = screenToBrowser(mx, my)
             lastBrowserMouseX = bx
             lastBrowserMouseY = by
@@ -262,6 +368,8 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     override fun mouseReleased(mx: Double, my: Double, button: Int): Boolean {
         if (isInPreviewArea(mx, my)) {
+            lastScreenMouseX = mx
+            lastScreenMouseY = my
             val (bx, by) = screenToBrowser(mx, my)
             lastBrowserMouseX = bx
             lastBrowserMouseY = by
@@ -273,6 +381,8 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     override fun mouseDragged(mx: Double, my: Double, button: Int, dragX: Double, dragY: Double): Boolean {
         if (browserFocused) {
+            lastScreenMouseX = mx
+            lastScreenMouseY = my
             val (bx, by) = screenToBrowser(mx, my)
             lastBrowserMouseX = bx
             lastBrowserMouseY = by
@@ -284,6 +394,8 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     override fun mouseMoved(mx: Double, my: Double) {
         if (browserFocused) {
+            lastScreenMouseX = mx
+            lastScreenMouseY = my
             val (bx, by) = screenToBrowser(mx, my)
             lastBrowserMouseX = bx
             lastBrowserMouseY = by

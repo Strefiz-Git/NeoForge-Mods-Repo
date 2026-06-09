@@ -76,7 +76,25 @@ object ClientGameEvents {
             if (be is MonitorBlockEntity && be.isMaster && be.isActive) {
                 val existing = ClientBrowserCache.get(be.blockPos)
                 if (existing == null) {
-                    LOGGER.info("[Monitor] chunk loaded with active monitor at {} - browser will be created on interaction", be.blockPos)
+                    if (be.shape == null) {
+                        be.recalculateClientShape()
+                    }
+                    if (be.shape != null) {
+                        val shape = be.shape!!
+                        val targetW = shape.width * be.pixelsPerBlock
+                        val targetH = shape.height * be.pixelsPerBlock
+                        LOGGER.info("[Monitor] chunk loaded active monitor at {} -> creating browser {}x{} url={}",
+                            be.blockPos, targetW, targetH, be.currentUrl)
+                        val b = MCEF.createBrowser(be.currentUrl, false, targetW, targetH)
+                        if (b != null) {
+                            ClientBrowserCache.put(be.blockPos, b)
+                            LOGGER.info("[Monitor] browser created for chunk-loaded monitor, textureID={}", b.renderer.textureID)
+                        } else {
+                            LOGGER.error("[Monitor] MCEF.createBrowser returned null for chunk-loaded monitor at {}!", be.blockPos)
+                        }
+                    } else {
+                        LOGGER.warn("[Monitor] chunk loaded monitor at {} has null shape (neighbors not loaded yet?)", be.blockPos)
+                    }
                 }
             }
         }
