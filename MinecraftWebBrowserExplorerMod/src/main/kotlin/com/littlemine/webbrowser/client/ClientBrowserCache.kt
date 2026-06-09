@@ -2,6 +2,7 @@ package com.littlemine.webbrowser.client
 
 import com.cinemamod.mcef.MCEF
 import com.cinemamod.mcef.MCEFBrowser
+import com.littlemine.webbrowser.client.renderer.MonitorBlockEntityRenderer
 import net.minecraft.core.BlockPos
 
 object ClientBrowserCache {
@@ -32,6 +33,7 @@ object ClientBrowserCache {
 
     fun recreate(pos: BlockPos, width: Int, height: Int, url: String): MCEFBrowser? {
         browsers.remove(pos)?.close()
+        MonitorBlockEntityRenderer.clearRenderTypeCache()
         val b = MCEF.createBrowser(url, false, width, height)
         if (b != null) {
             browsers[pos] = b

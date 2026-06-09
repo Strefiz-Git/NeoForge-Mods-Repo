@@ -29,11 +29,10 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     private lateinit var urlField: EditBox
     private lateinit var pixelsField: EditBox
-    private lateinit var previewWField: EditBox
-    private lateinit var previewHField: EditBox
     private lateinit var volumeField: EditBox
     private lateinit var brightnessField: EditBox
     private var audioMode: Int = monitor.audioMode
+    private lateinit var audioButton: Button
     private var browserFocused: Boolean = false
     private var lastBrowserMouseX: Double = 0.0
     private var lastBrowserMouseY: Double = 0.0
@@ -46,20 +45,14 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     private val rX: Int get() = (width * 0.7).toInt() + margin
     private val rW: Int get() = width - rX - margin
 
-    // Preview dimensions — defaults 70% width, full height
-    private var previewW: Int = 0
-    private var previewH: Int = 0
-
     private val previewX: Int get() = margin
     private val previewY: Int get() = margin
-    private val previewDrawW: Int get() = if (previewW > 0) previewW else (width * 7 / 10) - margin * 2
-    private val previewDrawH: Int get() = if (previewH > 0) previewH else height - margin * 2
+    private val previewDrawW: Int get() = (width * 7 / 10) - margin * 2
+    private val previewDrawH: Int get() = height - margin * 2
 
     override fun init() {
         LOGGER.info("[BrowserScreen] init() monitor={} active={} shape={} url={} ppb={}",
             monitor.blockPos, monitor.isActive, monitor.shape, monitor.currentUrl, monitor.pixelsPerBlock)
-        previewW = 0
-        previewH = 0
 
         if (ClientBrowserCache.get(monitor.blockPos) == null) {
             val shape = monitor.shape
@@ -84,16 +77,6 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         pixelsField.setFilter { s -> s.all { it.isDigit() } || s.isEmpty() }
         addRenderableWidget(pixelsField)
 
-        previewWField = EditBox(font, rX, 180, rW, 20, Component.literal("Preview Width"))
-        previewWField.value = previewDrawW.toString()
-        previewWField.setFilter { s -> s.all { it.isDigit() } || s.isEmpty() }
-        addRenderableWidget(previewWField)
-
-        previewHField = EditBox(font, rX, 220, rW, 20, Component.literal("Preview Height"))
-        previewHField.value = previewDrawH.toString()
-        previewHField.setFilter { s -> s.all { it.isDigit() } || s.isEmpty() }
-        addRenderableWidget(previewHField)
-
         addRenderableWidget(
             Button.Builder(Component.literal("Go"), { onGo() })
                 .bounds(rX, 65, rW / 2 - 2, 20)
@@ -106,44 +89,38 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
                 .build()
         )
 
-        addRenderableWidget(
-            Button.Builder(Component.literal("Apply Preview"), { onApplyPreviewSize() })
-                .bounds(rX, 245, rW, 20)
+        audioButton = addRenderableWidget(
+            Button.Builder(Component.literal("Audio: Player"), { onCycleAudio() })
+                .bounds(rX, 180, rW, 20)
                 .build()
         )
+        updateAudioButtonLabel()
 
-        val audioLabel = if (audioMode == 0) "Audio: Player" else "Audio: Center Block"
-        addRenderableWidget(
-            Button.Builder(Component.literal(audioLabel), { onCycleAudio() })
-                .bounds(rX, 280, rW, 20)
-                .build()
-        )
-
-        volumeField = EditBox(font, rX, 320, rW, 20, Component.literal("Volume"))
+        volumeField = EditBox(font, rX, 220, rW, 20, Component.literal("Volume"))
         volumeField.value = monitor.volume.toString()
         volumeField.setFilter { s -> s.all { it.isDigit() } || s.isEmpty() }
         addRenderableWidget(volumeField)
 
         addRenderableWidget(
             Button.Builder(Component.literal("Apply Audio"), { onApplyAudio() })
-                .bounds(rX, 345, rW, 20)
+                .bounds(rX, 245, rW, 20)
                 .build()
         )
 
-        brightnessField = EditBox(font, rX, 385, rW, 20, Component.literal("Brightness"))
+        brightnessField = EditBox(font, rX, 285, rW, 20, Component.literal("Brightness"))
         brightnessField.value = monitor.brightness.toString()
         brightnessField.setFilter { s -> s.all { it.isDigit() } || s.isEmpty() }
         addRenderableWidget(brightnessField)
 
         addRenderableWidget(
             Button.Builder(Component.literal("Apply Brightness"), { onApplyBrightness() })
-                .bounds(rX, 410, rW, 20)
+                .bounds(rX, 310, rW, 20)
                 .build()
         )
 
         addRenderableWidget(
             Button.Builder(Component.literal("Disconnect Command"), { onDisconnectCommand() })
-                .bounds(rX, 440, rW, 20)
+                .bounds(rX, 340, rW, 20)
                 .build()
         )
     }
@@ -179,22 +156,14 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         ))
     }
 
-    private fun onApplyPreviewSize() {
-        val w = previewWField.value.toIntOrNull() ?: return
-        val h = previewHField.value.toIntOrNull() ?: return
-        val maxW = ((width * 0.7).toInt() - margin * 2).coerceAtLeast(50)
-        val maxH = (height - margin * 2).coerceAtLeast(50)
-        val clampedW = w.coerceIn(50, maxW)
-        val clampedH = h.coerceIn(50, maxH)
-        previewWField.value = clampedW.toString()
-        previewHField.value = clampedH.toString()
-        previewW = clampedW
-        previewH = clampedH
-    }
-
     private fun onCycleAudio() {
         audioMode = if (audioMode == 0) 1 else 0
-        rebuildWidgets()
+        updateAudioButtonLabel()
+    }
+
+    private fun updateAudioButtonLabel() {
+        val label = if (audioMode == 0) "Audio: Player" else "Audio: Center Block"
+        audioButton.setMessage(Component.literal(label))
     }
 
     private fun onApplyAudio() {
@@ -241,10 +210,8 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
         guiGraphics.drawString(font, Component.literal("URL:"), rX, 28, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Pixels/Block:"), rX, 98, 0xFFFFFF)
-        guiGraphics.drawString(font, Component.literal("Preview W:"), rX, 168, 0xFFFFFF)
-        guiGraphics.drawString(font, Component.literal("Preview H:"), rX, 208, 0xFFFFFF)
-        guiGraphics.drawString(font, Component.literal("Volume (0-300):"), rX, 308, 0xFFFFFF)
-        guiGraphics.drawString(font, Component.literal("Brightness (0-100):"), rX, 373, 0xFFFFFF)
+        guiGraphics.drawString(font, Component.literal("Volume (0-300):"), rX, 208, 0xFFFFFF)
+        guiGraphics.drawString(font, Component.literal("Brightness (0-100):"), rX, 273, 0xFFFFFF)
 
         if (browserFocused) {
             guiGraphics.drawString(font, Component.literal("Browser mode - Press Tab for URL"), 10, height - 20, 0x888888)
@@ -471,6 +438,10 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
         if (browserFocused) {
+            if (keyCode == 256) {
+                onClose()
+                return true
+            }
             if (keyCode == 258) {
                 browserFocused = false
                 urlField.isFocused = true
@@ -481,11 +452,9 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         }
 
         if (keyCode == 258) {
-            if (urlField.isFocused || pixelsField.isFocused || previewWField.isFocused || previewHField.isFocused || volumeField.isFocused || brightnessField.isFocused) {
+            if (urlField.isFocused || pixelsField.isFocused || volumeField.isFocused || brightnessField.isFocused) {
                 urlField.isFocused = false
                 pixelsField.isFocused = false
-                previewWField.isFocused = false
-                previewHField.isFocused = false
                 volumeField.isFocused = false
                 brightnessField.isFocused = false
                 browserFocused = true

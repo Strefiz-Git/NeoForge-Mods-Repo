@@ -1,12 +1,15 @@
 package com.littlemine.webbrowser.block
 
 import com.littlemine.webbrowser.ClientBridge
+import com.littlemine.webbrowser.item.MonitorCommandItem
 import com.littlemine.webbrowser.logic.MonitorShape
 import com.littlemine.webbrowser.logic.MonitorShapeDetector
 import com.littlemine.webbrowser.registry.BlockEntityRegistry
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.core.HolderLookup
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.game.ClientGamePacketListener
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket
@@ -64,6 +67,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                         be.height = 1
                         be.masterPos = p
                         be.shape = null
+                        be.setChanged()
                     }
                 }
             }
@@ -81,6 +85,24 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
             } else {
                 ClientBridge.onMonitorBreak?.invoke(this)
             }
+        } else {
+            val serverLevel = level as? net.minecraft.server.level.ServerLevel
+            if (serverLevel != null) {
+                for (player in serverLevel.players()) {
+                    for (stack in listOf(player.mainHandItem, player.offhandItem)) {
+                        if (stack.item is MonitorCommandItem && MonitorCommandItem.isConnected(stack)) {
+                            val connectedPos = MonitorCommandItem.getConnectedPos(stack)
+                            if (connectedPos == oldMasterPos) {
+                                MonitorCommandItem.disconnect(stack)
+                                player.displayClientMessage(
+                                    Component.translatable("message.webbrowser.monitor_broken"),
+                                    true
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -93,6 +115,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
 
     fun tryFormMonitor() {
         val level = level ?: return
+        if (level.isClientSide) return
         val detected = MonitorShapeDetector.findRectangle(blockPos, level)
         LOGGER.info("[BE] tryFormMonitor at {} detected={} (was active={} oldShape={})",
             blockPos, detected, isActive, shape)
@@ -129,6 +152,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                     be.width = detected.width
                     be.height = detected.height
                     be.pixelsPerBlock = pixelsPerBlock
+                    be.audioMode = audioMode
                     be.volume = volume
                     be.brightness = brightness
                     be.isActive = true
@@ -141,17 +165,6 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         LOGGER.info("[BE] tryFormMonitor SUCCESS: {}x{} active at master={} resized={}",
             width, height, masterPos, wasResized)
         setChanged()
-
-        if (level.isClientSide) {
-            val oldPos = oldMasterPos
-            if (oldPos != null && oldPos != detected.topLeft) {
-                val oldMasterBE = level.getBlockEntity(oldPos)
-                if (oldMasterBE is MonitorBlockEntity) {
-                    ClientBridge.onMonitorBreak?.invoke(oldMasterBE)
-                }
-            }
-            ClientBridge.onMonitorFormed?.invoke(this)
-        }
     }
 
     override fun saveAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {
@@ -165,6 +178,15 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         tag.putInt("brightness", brightness)
         tag.putBoolean("active", isActive)
         tag.putLong("master_pos", masterPos.asLong())
+        val s = shape
+        if (s != null) {
+            tag.putLong("shape_topLeft", s.topLeft.asLong())
+            tag.putInt("shape_width", s.width)
+            tag.putInt("shape_height", s.height)
+            tag.putString("shape_facing", s.facing.name)
+            tag.putString("shape_rightDir", s.rightDir.name)
+            tag.putString("shape_downDir", s.downDir.name)
+        }
     }
 
     override fun loadAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {
@@ -179,15 +201,43 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         if (tag.contains("brightness")) brightness = tag.getInt("brightness")
         isActive = tag.getBoolean("active")
         if (tag.contains("master_pos")) masterPos = BlockPos.of(tag.getLong("master_pos"))
-        if (level?.isClientSide == true && wasActive && !isActive) {
-            val master = if (isMaster) this else level?.getBlockEntity(masterPos)
-            if (master is MonitorBlockEntity) {
-                ClientBridge.onMonitorBreak?.invoke(master)
+        if (tag.contains("shape_width")) {
+            val facing = Direction.byName(tag.getString("shape_facing"))
+            val rightDir = Direction.byName(tag.getString("shape_rightDir"))
+            val downDir = Direction.byName(tag.getString("shape_downDir"))
+            if (facing != null && rightDir != null && downDir != null) {
+                shape = MonitorShape(
+                    topLeft = BlockPos.of(tag.getLong("shape_topLeft")),
+                    width = tag.getInt("shape_width"),
+                    height = tag.getInt("shape_height"),
+                    facing = facing,
+                    rightDir = rightDir,
+                    downDir = downDir
+                )
             } else {
-                ClientBridge.onMonitorBreak?.invoke(this)
+                shape = null
+            }
+        } else {
+            shape = null
+        }
+        if (level?.isClientSide == true) {
+            if (wasActive && !isActive) {
+                val master = if (isMaster) this else level?.getBlockEntity(masterPos)
+                if (master is MonitorBlockEntity) {
+                    ClientBridge.onMonitorBreak?.invoke(master)
+                } else {
+                    ClientBridge.onMonitorBreak?.invoke(this)
+                }
+            } else if (!wasActive && isActive) {
+                val master = if (isMaster) this else level?.getBlockEntity(masterPos)
+                if (master is MonitorBlockEntity) {
+                    ClientBridge.onMonitorFormed?.invoke(master)
+                } else {
+                    ClientBridge.onMonitorFormed?.invoke(this)
+                }
             }
         }
-        if (isActive) recalculateClientShape()
+        if (isActive && shape == null) recalculateClientShape()
     }
 
     fun recalculateClientShape() {

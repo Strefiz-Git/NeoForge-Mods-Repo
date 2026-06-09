@@ -71,7 +71,7 @@ class MonitorBlock(properties: Properties) : Block(properties), EntityBlock {
 
     override fun onPlace(state: BlockState, level: Level, pos: BlockPos, oldState: BlockState, movedByPiston: Boolean) {
         LOGGER.info("[MonitorBlock] onPlace at {} facing={} active={}", pos, state.getValue(FACING), state.getValue(ACTIVE))
-        if (state.block !== oldState.block) {
+        if (!level.isClientSide && state.block !== oldState.block) {
             val be = level.getBlockEntity(pos)
             if (be is MonitorBlockEntity) be.tryFormMonitor()
         }

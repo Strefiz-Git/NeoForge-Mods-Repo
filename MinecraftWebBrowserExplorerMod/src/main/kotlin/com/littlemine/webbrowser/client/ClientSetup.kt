@@ -144,7 +144,7 @@ object ClientGameEvents {
             return
         }
 
-        if (be is MonitorBlockEntity && be.isActive) {
+        if (be is MonitorBlockEntity && be.isActive && item.item !is MonitorCommandItem) {
             LOGGER.info("[Monitor] RightClickBlock on active monitor without command at {}", event.pos)
             event.setCanceled(true)
             player.displayClientMessage(

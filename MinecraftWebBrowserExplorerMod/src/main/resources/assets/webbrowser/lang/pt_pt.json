@@ -10,6 +10,7 @@
     "message.webbrowser.connected": "Comando conectado!",
     "message.webbrowser.disconnected": "Comando desligado - monitor já não está ativo",
     "message.webbrowser.already_connected": "Este comando já está conectado a um monitor",
+    "message.webbrowser.monitor_broken": "Monitor foi partido - comando desligado",
     "tooltip.webbrowser.connected_to": "Conectado a: %d, %d, %d",
     "tooltip.webbrowser.not_connected": "Não conectado"
 }

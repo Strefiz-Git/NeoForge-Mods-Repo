@@ -21,19 +21,8 @@ object GameEvents {
         val be = event.level.getBlockEntity(event.pos)
         if (be !is MonitorBlockEntity || !be.isActive) return
 
-        LOGGER.info("[GameEvents] LeftClickBlock on active monitor at {} shift={}", event.pos, player.isShiftKeyDown)
+        LOGGER.info("[GameEvents] LeftClickBlock on active monitor at {}", event.pos)
         event.setCanceled(true)
-
-        if (!player.isShiftKeyDown) return
-
-        // Shift+left-click → connect command to this monitor
-        if (event.level.isClientSide) {
-            LOGGER.info("[GameEvents] Sending CommandSyncPacket for {}", event.pos)
-            MonitorCommandItem.connectTo(item, be.masterPos)
-            PacketDistributor.sendToServer(CommandSyncPacket(
-                event.pos.x, event.pos.y, event.pos.z, true
-            ))
-        }
     }
 
     @SubscribeEvent
@@ -48,9 +37,20 @@ object GameEvents {
             return
         }
 
-        LOGGER.info("[GameEvents] RightClickBlock on active monitor at {} item={} connected={}",
-            event.pos, item.item,
-            item.item is MonitorCommandItem && MonitorCommandItem.isConnected(item))
         event.setCanceled(true)
+
+        if (item.item is MonitorCommandItem && !MonitorCommandItem.isConnected(item)) {
+            LOGGER.info("[GameEvents] RightClickBlock - connecting command to monitor at {}", event.pos)
+            if (event.level.isClientSide) {
+                MonitorCommandItem.connectTo(item, be.masterPos)
+                PacketDistributor.sendToServer(CommandSyncPacket(
+                    event.pos.x, event.pos.y, event.pos.z, true
+                ))
+                player.displayClientMessage(
+                    net.minecraft.network.chat.Component.translatable("message.webbrowser.connected"),
+                    true
+                )
+            }
+        }
     }
 }
