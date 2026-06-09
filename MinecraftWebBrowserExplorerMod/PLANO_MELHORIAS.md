@@ -31,107 +31,104 @@
 
 ---
 
-## Fase 1: Configurações do Mod (NeoForge Config)
+## Fase 1: Configurações do Mod (NeoForge Config) — ✅ FEITO
 
 ### 1.1 Sistema de Config (`MonitorConfig.kt`)
 Usar sistema `net.neoforged.neoforge.common.ModConfigSpec` com ficheiro separado.
 
-**Categorias:**
+**Implementado em:**
+- `MonitorConfig.kt` em `com.littlemine.webbrowser.config`
+- Registado em `MonitorMod.kt` (constructor aceita `ModContainer`, usa `container.registerConfig()`)
+- `BrowserConstants.kt` lê `MonitorConfig.maxResolutionPerBlock`
+- `MonitorBlockEntityRenderer` usa `MonitorConfig.maxMonitorsRendered` + `logBrowserLifecycle`
 
-#### Client Config (`webbrowser-client.toml`)
-| Chave | Tipo | Default | Descrição |
-|-------|------|---------|-----------|
-| `renderScreens` | boolean | `true` | Toggle global para renderizar/ocultar todos os ecrãs no mundo |
-| `maxRenderDistance` | int | `6` | Distância máxima (chunks) para renderizar ecrãs |
-| `maxMonitorsRendered` | int | `8` | Máximo de monitores renderizados ao mesmo tempo (0 = ilimitado) |
-| `maxResolutionPerBlock` | int | `120` | Máximo de pixels por bloco que um monitor pode ter |
-| `browserHeapMemoryMB` | int | `512` | Memória máxima para browsers CEF (evitar crashes) |
-| `enableBrowserPreviews` | boolean | `true` | Mostrar preview do browser no GUI |
-| `logBrowserLifecycle` | boolean | `false` | Log detalhado de criação/destruição de browsers |
-
-#### Common Config (`webbrowser-common.toml`)
-| Chave | Tipo | Default | Descrição |
-|-------|------|---------|-----------|
-| `maxMonitorsPerPlayer` | int | `-1` | Máximo de monitores que um jogador pode ter ativos (-1 = ilimitado) |
-
-### 1.2 Implementação
-- Criar `MonitorConfig.kt` em `com.littlemine.webbrowser.config`
-- Registrar no `MonitorMod.kt` via `ModLoadingContext.get().registerConfig()`
-- Aplicar limites no `BrowserConstants.kt` (usar valores do config)
-- Passar `maxMonitorsRendered` e `maxResolutionPerBlock` para os respetivos locais
+**Configs geradas automaticamente:**
+- `webbrowser-client.toml` — `renderScreens`, `maxMonitorsRendered`, `maxResolutionPerBlock`, `logBrowserLifecycle`
+- `webbrowser-common.toml` — `maxMonitorsPerPlayer` (definida mas não enforced)
 
 ---
 
 ## Fase 2: Melhorias de Performance
 
-### 2.1 Culling de Monitores Fora da Vista
-- **Atual:** `shouldRenderOffScreen()` retorna `true` — renderiza mesmo atrás do jogador
-- **Mudança:** Calcular se o monitor está dentro do frustum/cone de visão do jogador
-- Usar `Camera.isActive()` + direção do jogador para skip de monitores atrás
+### 2.1 Culling de Monitores Fora da Vista — ✅ FEITO
+- `MonitorBlockEntityRenderer.render()` calcula dot product com `camera.getLookVector()`
+- Skip se `dot < -1.0` (monitor atrás do jogador)
+- **Ficheiro:** `MonitorBlockEntityRenderer.kt`
 
-### 2.2 Limite de Monitores Renderizados por Frame (`maxMonitorsRendered`)
-- No `MonitorBlockEntityRenderer.render()`, contar monitores renderizados este frame
-- Se exceder `maxMonitorsRendered`, saltar render (manter preview GUI funcional)
+### 2.2 Limite de Monitores Renderizados por Frame — ✅ FEITO
+- Contador `renderedThisFrame` no `MonitorBlockEntityRenderer`
+- Se excede `MonitorConfig.maxMonitorsRendered`, saltar render
+- Reset a cada game tick via `ClientTickEvent`
+- **Ficheiro:** `MonitorBlockEntityRenderer.kt`, `ClientSetup.kt`
 
-### 2.3 LOD (Level of Detail) para Monitores Distantes
+### 2.3 LOD (Level of Detail) para Monitores Distantes — ⏳ Pendente
 - A partir de X chunks de distância, reduzir resolução interna do CEF browser
 - Ou usar textura estática (screenshot de baixa resolução) para monitores longe
 - Prioridade: baixa — implementar só se a performance for realmente um problema
 
-### 2.4 Gestão de Memória dos Browsers CEF
-- **Atual:** browsers são criados e só destruídos quando o monitor é partido
-- **Melhoria:** Destruir browsers de monitores que estão a mais de 12 chunks do jogador (LRU cache)
-- Recriar quando o jogador se aproxima
-- Usar `ClientTickEvent` para verificar distâncias periodicamente (a cada 20 ticks = 1s)
+### 2.4 Gestão de Memória dos Browsers CEF — ✅ FEITO
+- `ClientBrowserCache.getAllPositions()` exposto
+- A cada 20 ticks em `ClientTickEvent.Pre`, monitores >12 chunks do jogador são destruídos
+- Áudio correspondente é deregistado via `MCEFAudioEngine.removeSource()`
+- **Ficheiro:** `ClientSetup.kt`, `ClientBrowserCache.kt`
 
-### 2.5 Evitar Alocação de Objetos no Render Loop
+### 2.5 Evitar Alocação de Objetos no Render Loop — ⏳ Pendente
 - **Atual:** `ByteBufferBuilder(256)` + `BufferBuilder()` criados a cada frame em cada BE renderizado
 - **Mudança:** Reutilizar buffers estáticos ou usar pool de objetos
 - Prioridade: baixa — micro-otimização, impacto mínimo
 
 ---
 
-## Fase 3: Melhorias de UX
+## Fase 3: Melhorias de UX — ✅ FEITO
 
 ### 3.1 Botão "Refresh" no GUI
-- Recarregar a página atual sem precisar de reescrever a URL
+- Botão "Ref" ao lado do "Go" no `BrowserScreen`
+- Chama `browser.loadURL()` com a URL atual
 
-### 3.2 Barra de Progresso de Loading
-- MCEF tem callbacks de loading state — mostrar "Loading..." na preview
+### 3.2 Indicador de Loading
+- "Loading..." mostrado quando `textureID <= 0` no preview e fullscreen
 
 ### 3.3 Atalhos de Teclado no BrowserScreen
 - `F5` = Refresh
 - `Ctrl+L` = focar URL field
 - `Ctrl+W` = fechar ecrã
 
-### 3.4 Notificação quando Browser Crasha
-- MCEF tem callback `onCrashed()` — mostrar mensagem ao jogador
+### 3.4 Notificação quando Browser Crasha — ⏳ Pendente
+- MCEF tem callback `onCrashed()` — não usado atualmente
 
 ---
 
 ## Fase 4: Funcionalidades Pendentes
 
-### 4.1 Áudio real do CEF (mais complexo)
-- **Estado atual:** data model + GUI + packet existem, mas sem captura/reprodução
-- **Necessário:** Investigar API do MCEF para captura de áudio (`MCEFBrowser` has audio methods?)
-- Se MCEF não suportar, usar abordagem alternativa: gravar sistema sound do PC
-- Prioridade: baixa — muito complexo para o ganho
+### 4.1 Áudio real do CEF — ✅ FEITO
+- `MCEFAudioEngine.kt` implementa `CefAudioHandler`
+- Recebe PCM float em `onAudioStreamPacket()`, converte para 16-bit signed
+- 4 OpenAL buffers por monitor em round-robin para streaming contínuo
+- Modos: "Player" (relativo ao jogador, `AL_SOURCE_RELATIVE`) e "Center Block" (posicional)
+- Volume controla `AL_GAIN` via `volume/100f` (clamped 0.0–3.0)
+- **Ficheiro:** `MCEFAudioEngine.kt`
 
-### 4.2 Botão "Fullscreen" no GUI
-- Fechar o GUI e mostrar o browser a ocupar todo o ecrã (sobreposição)
-- Requer nova Screen ou usar `MCEFBrowser.resize()` + input forwarding
+### 4.2 Fullscreen — ✅ FEITO
+- Botão "Fullscreen" no `BrowserScreen`
+- ESC sai de fullscreen para modo normal (outro ESC fecha o ecrã)
+- Mouse mapping corrigido (`screenToBrowser()` + `renderCursor()` usam toda a tela)
+- **Ficheiro:** `BrowserScreen.kt`
 
 ---
 
-## Ordem de Implementação
+## Estado Atual
 
 ```
-1. Fase 0 — Testar funcionalidade + verificar logs
-2. Fase 1 — Sistema de Config (MonitorConfig.kt)
-3. Fase 2.1 — Culling de monitores fora da vista
-4. Fase 2.2 — Limite de monitores renderizados
-5. Fase 2.4 — Gestão de memória (destruir browsers distantes)
-6. Fase 3 — Melhorias de UX (refresh, loading, atalhos)
-7. Fase 2.3 — LOD (se necessário)
-8. Fase 4 — Funcionalidades pendentes (se relevante)
+✅ Fase 0 — Testar funcionalidade + verificar logs
+✅ Fase 1 — Sistema de Config (MonitorConfig.kt)
+✅ Fase 2.1 — Culling de monitores fora da vista
+✅ Fase 2.2 — Limite de monitores renderizados
+✅ Fase 2.4 — Gestão de memória (destruir browsers distantes)
+✅ Fase 3 — Melhorias de UX (refresh, loading, atalhos)
+✅ Fase 4.1 — Áudio real do CEF (OpenAL streaming)
+✅ Fase 4.2 — Fullscreen
+⏳ Fase 2.3 — LOD (pendente, baixa prioridade)
+⏳ Fase 2.5 — Pool de objetos no render loop (pendente, baixa prioridade)
+⏳ Fase 3.4 — Notificação de crash (pendente, baixa prioridade)
+⏳ maxMonitorsPerPlayer — Config existe mas não enforced no servidor
 ```

@@ -38,6 +38,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     private var lastBrowserMouseY: Double = 0.0
     private var lastScreenMouseX: Double = 0.0
     private var lastScreenMouseY: Double = 0.0
+    private var fullscreen: Boolean = false
 
     private val margin: Int = 10
 
@@ -79,13 +80,19 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
         addRenderableWidget(
             Button.Builder(Component.literal("Go"), { onGo() })
-                .bounds(rX, 65, rW / 2 - 2, 20)
+                .bounds(rX, 65, rW / 3 - 2, 20)
+                .build()
+        )
+
+        addRenderableWidget(
+            Button.Builder(Component.literal("Ref"), { onRefresh() })
+                .bounds(rX + rW / 3 + 1, 65, rW / 3 - 2, 20)
                 .build()
         )
 
         addRenderableWidget(
             Button.Builder(Component.literal("Apply Res"), { onApplyResolution() })
-                .bounds(rX + rW / 2 + 2, 65, rW / 2 - 2, 20)
+                .bounds(rX + 2 * rW / 3 + 2, 65, rW / 3 - 2, 20)
                 .build()
         )
 
@@ -123,6 +130,12 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
                 .bounds(rX, 340, rW, 20)
                 .build()
         )
+
+        addRenderableWidget(
+            Button.Builder(Component.literal("Fullscreen"), { onToggleFullscreen() })
+                .bounds(rX, 370, rW, 20)
+                .build()
+        )
     }
 
     private fun onGo() {
@@ -136,6 +149,19 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         PacketDistributor.sendToServer(MonitorUpdatePacket(
             monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z, monitor.currentUrl
         ))
+    }
+
+    private fun onRefresh() {
+        val browser = ClientBrowserCache.get(monitor.blockPos)
+        browser?.loadURL(monitor.currentUrl)
+    }
+
+    private fun onToggleFullscreen() {
+        fullscreen = !fullscreen
+        if (fullscreen) {
+            browserFocused = true
+            urlField.isFocused = false
+        }
     }
 
     private fun onApplyResolution() {
@@ -203,6 +229,12 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     }
 
     override fun render(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        if (fullscreen) {
+            renderFullscreenBrowser(guiGraphics)
+            renderCursor(guiGraphics)
+            return
+        }
+
         super.render(guiGraphics, mouseX, mouseY, partialTick)
 
         renderBrowserPreview(guiGraphics)
@@ -220,10 +252,13 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     private fun renderCursor(guiGraphics: GuiGraphics) {
         if (!browserFocused) return
-        val area = getScaledPreviewArea() ?: return
-        val (drawX, drawY, drawW, drawH) = area
-        val cx = lastScreenMouseX.coerceIn(drawX.toDouble(), drawX + drawW.toDouble())
-        val cy = lastScreenMouseY.coerceIn(drawY.toDouble(), drawY + drawH.toDouble())
+        val (areaX, areaY, areaW, areaH) = if (fullscreen) {
+            Quadruple(0f, 0f, width.toFloat(), height.toFloat())
+        } else {
+            getScaledPreviewArea() ?: return
+        }
+        val cx = lastScreenMouseX.coerceIn(areaX.toDouble(), areaX + areaW.toDouble())
+        val cy = lastScreenMouseY.coerceIn(areaY.toDouble(), areaY + areaH.toDouble())
         val ix = cx.toInt()
         val iy = cy.toInt()
         val col = 0xFFFFFFFF.toInt()
@@ -325,7 +360,10 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         val texId = browser.renderer.textureID
         LOGGER.info("[BrowserScreen] renderBrowserPreview texId={} area={}x{} isGood={}",
             texId, drawW.toInt(), drawH.toInt(), texId > 0)
-        if (texId <= 0) return
+        if (texId <= 0) {
+            guiGraphics.drawString(font, Component.literal("Loading..."), drawX.toInt() + 5, drawY.toInt() + 5, 0x888888)
+            return
+        }
 
         val matrix = guiGraphics.pose().last().pose()
 
@@ -349,18 +387,58 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         RenderSystem.enableDepthTest()
     }
 
+    private fun renderFullscreenBrowser(guiGraphics: GuiGraphics) {
+        val browser = ClientBrowserCache.get(monitor.blockPos)
+        if (browser == null) {
+            guiGraphics.fill(0, 0, width, height, 0xFF222222.toInt())
+            guiGraphics.drawString(font, Component.literal("No browser"), width / 2 - 20, height / 2 - 5, 0x888888)
+            return
+        }
+        val texId = browser.renderer.textureID
+        if (texId <= 0) {
+            guiGraphics.fill(0, 0, width, height, 0xFF222222.toInt())
+            guiGraphics.drawString(font, Component.literal("Loading..."), width / 2 - 20, height / 2 - 5, 0x888888)
+            return
+        }
+
+        RenderSystem.disableDepthTest()
+        RenderSystem.enableBlend()
+        RenderSystem.defaultBlendFunc()
+        val bri = monitor.brightness.coerceIn(1, BrowserConstants.MAX_BRIGHTNESS) / 100f
+        RenderSystem.setShaderColor(bri, bri, bri, 1f)
+        RenderSystem.setShaderTexture(0, texId)
+        RenderSystem.setShader(GameRenderer::getPositionTexShader)
+
+        val matrix = guiGraphics.pose().last().pose()
+        val bb = ByteBufferBuilder(256)
+        val builder = BufferBuilder(bb, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
+
+        builder.addVertex(matrix, 0f, 0f, 0f).setUv(0f, 0f)
+        builder.addVertex(matrix, 0f, height.toFloat(), 0f).setUv(0f, 1f)
+        builder.addVertex(matrix, width.toFloat(), height.toFloat(), 0f).setUv(1f, 1f)
+        builder.addVertex(matrix, width.toFloat(), 0f, 0f).setUv(1f, 0f)
+
+        BufferUploader.drawWithShader(builder.buildOrThrow())
+        RenderSystem.enableDepthTest()
+    }
+
     private fun isInPreviewArea(mx: Double, my: Double): Boolean {
+        if (fullscreen) return true
         val area = getScaledPreviewArea() ?: return false
         val (drawX, drawY, drawW, drawH) = area
         return mx >= drawX && mx <= drawX + drawW && my >= drawY && my <= drawY + drawH
     }
 
     private fun screenToBrowser(mx: Double, my: Double): Pair<Double, Double> {
-        val area = getScaledPreviewArea() ?: return Pair(0.0, 0.0)
-        val (drawX, drawY, drawW, drawH) = area
         val dims = getBrowserDimensions() ?: return Pair(0.0, 0.0)
         val (bw, bh) = dims
-
+        if (fullscreen) {
+            val relX = (mx / width).coerceIn(0.0, 1.0)
+            val relY = (my / height).coerceIn(0.0, 1.0)
+            return Pair(relX * bw, relY * bh)
+        }
+        val area = getScaledPreviewArea() ?: return Pair(0.0, 0.0)
+        val (drawX, drawY, drawW, drawH) = area
         val relX = ((mx - drawX) / drawW).coerceIn(0.0, 1.0)
         val relY = ((my - drawY) / drawH).coerceIn(0.0, 1.0)
         return Pair(relX * bw, relY * bh)
@@ -437,6 +515,25 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     }
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+        if (fullscreen) {
+            if (keyCode == 256) {
+                fullscreen = false
+                return true
+            }
+            ClientBrowserCache.get(monitor.blockPos)?.sendKeyPress(keyCode, scanCode.toLong(), modifiers)
+            return true
+        }
+
+        // Global shortcuts
+        if (keyCode == 290) {
+            onRefresh()
+            return true
+        }
+        if ((modifiers and 1) != 0 && keyCode == 87) {
+            onClose()
+            return true
+        }
+
         if (browserFocused) {
             if (keyCode == 256) {
                 onClose()
@@ -448,6 +545,12 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
                 return true
             }
             ClientBrowserCache.get(monitor.blockPos)?.sendKeyPress(keyCode, scanCode.toLong(), modifiers)
+            return true
+        }
+
+        if ((modifiers and 1) != 0 && keyCode == 76) {
+            urlField.isFocused = true
+            browserFocused = false
             return true
         }
 

@@ -1,6 +1,6 @@
 # Plano de Correções — MonitorMod (webbrowser)
 
-> **Nota:** Todos os bugs abaixo foram corrigidos na sessão de 2026-06-09.
+> **Nota:** Todos os bugs abaixo foram corrigidos na sessão de 2026-06-09. Sessão seguinte (2026-06-09 v2) implementou áudio real, volume, brightness >100, right-click connect, UX refresh/shortcuts/fullscreen, config system, culling, render limit e LRU cache.
 
 ---
 
@@ -69,6 +69,53 @@
 - **Ficheiro:** `ClientBrowserCache.kt:36`
 
 ### 15. `onCycleAudio()` destrói estado dos widgets — CORRIGIDO
+
+### 16. Brightness >100 causa overflow — CORRIGIDO
+- Clamp máximo alterado de 100 para 500 em `BrowserConstants.kt`
+- Fórmula de render: `brightness.coerceIn(1, MAX_BRIGHTNESS) / 100f` (já dava oversaturation)
+- **Ficheiro:** `BrowserConstants.kt`, `Network.kt`, `BrowserScreen.kt`, `MonitorBlockEntityRenderer.kt`
+
+### 17. Áudio do CEF não era capturado — CORRIGIDO
+- `MCEFAudioEngine.kt` implementa `CefAudioHandler`
+- Recebe PCM float em `onAudioStreamPacket()`, converte para 16-bit signed
+- 4 OpenAL buffers por monitor em round-robin para streaming contínuo
+- Suporta modo "Player" (relativo ao jogador) e "Center Block" (posicional no bloco)
+- Volume controla `AL_GAIN` via `volume/100f` (clamped 0.0–3.0)
+- **Ficheiro:** `MCEFAudioEngine.kt`
+
+### 18. Right-click não conectava comando — CORRIGIDO
+- `MonitorBlock.useWithoutItem()` agora detecta `MonitorCommandItem` e faz connect via right-click
+- Shift+left-click removido
+- **Ficheiro:** `MonitorBlock.kt`
+
+### 19. Config system inexistente — CORRIGIDO
+- `MonitorConfig.kt` com `ModConfigSpec` — client + common configs
+- Registado em `MonitorMod.kt` via `container.registerConfig()`
+- `maxResolutionPerBlock`, `maxMonitorsRendered`, `logBrowserLifecycle` em uso
+- **Ficheiro:** `MonitorConfig.kt`, `MonitorMod.kt`, `BrowserConstants.kt`
+
+### 20. Sem culling de monitores atrás do jogador — CORRIGIDO
+- Dot product entre `camera.getLookVector()` e vetor `blockCenter - camera.position`
+- Skip se `dot < -1.0` (monitor atrás do jogador)
+- **Ficheiro:** `MonitorBlockEntityRenderer.kt`
+
+### 21. Sem limite de render por frame — CORRIGIDO
+- Contador `renderedThisFrame` incrementado a cada BE renderizado
+- Se excede `MonitorConfig.maxMonitorsRendered`, saltar render
+- Reset a cada game tick via `ClientTickEvent`
+- **Ficheiro:** `MonitorBlockEntityRenderer.kt`, `ClientSetup.kt`
+
+### 22. Browsers distantes nunca são limpos — CORRIGIDO
+- `ClientBrowserCache.getAllPositions()` exposto
+- A cada 20 ticks, monitores >12 chunks do jogador são destruídos (LRU)
+- Áudio correspondente é deregistado
+- **Ficheiro:** `ClientSetup.kt`, `ClientBrowserCache.kt`
+
+### 23. Fullscreen não existia — CORRIGIDO
+- Botão toggle no `BrowserScreen`
+- ESC sai de fullscreen (volta a normal)
+- Mouse mapping corrigido para fullscreen (`screenToBrowser()` + `renderCursor()`)
+- **Ficheiro:** `BrowserScreen.kt`
 - `audioButton: Button` guardado como field da classe em vez de ser anónimo
 - `onCycleAudio()` já não chama `rebuildWidgets()` — apenas `updateAudioButtonLabel()` que faz `audioButton.setMessage()`
 - **Ficheiro:** `BrowserScreen.kt:37`, `BrowserScreen.kt:116-121`, `BrowserScreen.kt:196-204`
@@ -86,8 +133,10 @@
 
 ## Funcionalidades em Falta (ainda relevantes)
 
-- **Áudio real do CEF** — Campos e packet existem, mas não há captura/reprodução do stream de áudio do MCEF
 - **Widevine/DRM** — Ausente; Netflix/Disney+ não funcionam
+- **maxMonitorsPerPlayer** — Config definida mas não enforced no servidor
+- **Notificação de crash** — MCEF tem `onCrashed()` callback, não usado
+- **LOD para monitores distantes** — Podia reduzir resolução interna do CEF a partir de X chunks
 
 ---
 

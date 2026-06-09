@@ -4,11 +4,14 @@ import com.cinemamod.mcef.MCEF
 import com.cinemamod.mcef.MCEFBrowser
 import com.littlemine.webbrowser.client.audio.MCEFAudioEngine
 import com.littlemine.webbrowser.client.renderer.MonitorBlockEntityRenderer
+import com.littlemine.webbrowser.config.MonitorConfig
 import net.minecraft.core.BlockPos
 
 object ClientBrowserCache {
     private val browsers = mutableMapOf<BlockPos, MCEFBrowser>()
     private val LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
+
+    private val lifecycleLogging: Boolean get() = MonitorConfig.logBrowserLifecycle?.get() ?: true
 
     fun get(pos: BlockPos): MCEFBrowser? {
         val b = browsers[pos]
@@ -16,14 +19,16 @@ object ClientBrowserCache {
         return b
     }
 
+    fun getAllPositions(): List<BlockPos> = browsers.keys.toList()
+
     fun put(pos: BlockPos, browser: MCEFBrowser) {
         val old = browsers.put(pos, browser)
         if (old != null && old !== browser) {
-            LOGGER.info("[BrowserCache] put({}) - closing old browser, url={}", pos, old.url)
+            if (lifecycleLogging) LOGGER.info("[BrowserCache] put({}) - closing old browser, url={}", pos, old.url)
             MCEFAudioEngine.unregister(pos)
             old.close()
         } else {
-            LOGGER.info("[BrowserCache] put({}) - new browser, url={}", pos, browser.url)
+            if (lifecycleLogging) LOGGER.info("[BrowserCache] put({}) - new browser, url={}", pos, browser.url)
         }
         MCEFAudioEngine.register(pos, browser)
     }
@@ -31,7 +36,7 @@ object ClientBrowserCache {
     fun remove(pos: BlockPos) {
         val b = browsers.remove(pos)
         MCEFAudioEngine.unregister(pos)
-        LOGGER.info("[BrowserCache] remove({}) = {}", pos, if (b != null) "closed url=" + b.url else "absent")
+        if (lifecycleLogging) LOGGER.info("[BrowserCache] remove({}) = {}", pos, if (b != null) "closed url=" + b.url else "absent")
         b?.close()
     }
 

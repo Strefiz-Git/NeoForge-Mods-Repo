@@ -4,18 +4,22 @@ import com.littlemine.webbrowser.block.MonitorBlock
 import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.client.ClientBrowserCache
+import com.littlemine.webbrowser.config.MonitorConfig
 import com.mojang.blaze3d.vertex.BufferBuilder
 import com.mojang.blaze3d.vertex.BufferUploader
 import com.mojang.blaze3d.vertex.ByteBufferBuilder
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexFormat
+import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.core.BlockPos
 import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.core.Direction
+import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import org.joml.Vector4f
@@ -25,11 +29,16 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
 
     companion object {
         private val renderTypeCache = mutableMapOf<Int, RenderType>()
+        private val renderedMasters = mutableSetOf<BlockPos>()
+        private var lastRenderTick = -1L
+
+        fun resetRenderCount() {
+            renderedMasters.clear()
+        }
 
         fun clearRenderTypeCache() {
             val count = renderTypeCache.size
             renderTypeCache.clear()
-            // LOGGER is not accessible in companion, use the one from the class
         }
 
         private fun getOrCreateRenderType(textureId: Int): RenderType =
@@ -58,6 +67,31 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
             LOGGER.trace("[Renderer] no browser for master {} at {}", master.blockPos, entity.blockPos)
             return
         }
+
+        // Config: render toggle
+        if (MonitorConfig.renderScreens?.get() != true) {
+            LOGGER.trace("[Renderer] renderScreens disabled, skip {}", entity.blockPos)
+            return
+        }
+
+        // Frustum culling: skip if block is behind camera (normalized dot product)
+        val camera = Minecraft.getInstance().gameRenderer.mainCamera
+        val blockCenter = Vec3.atCenterOf(entity.blockPos)
+        val toBlock = blockCenter.subtract(camera.position).normalize()
+        val lookVec = camera.getLookVector()
+        val dot = lookVec.dot(toBlock)
+        if (dot < 0.0) {
+            LOGGER.trace("[Renderer] behind camera (dot={}), skip {}", dot, entity.blockPos)
+            return
+        }
+
+        // Render limit: count unique monitors (masters), not individual blocks
+        val limit = MonitorConfig.maxMonitorsRendered?.get() ?: 0
+        if (limit > 0 && master.blockPos !in renderedMasters && renderedMasters.size >= limit) {
+            LOGGER.trace("[Renderer] render limit hit ({}), skip {}", limit, entity.blockPos)
+            return
+        }
+        renderedMasters.add(master.blockPos)
 
         val state = entity.blockState
         val facing = state.getValue(MonitorBlock.FACING)

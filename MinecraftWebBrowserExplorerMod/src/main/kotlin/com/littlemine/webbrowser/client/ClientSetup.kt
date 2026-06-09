@@ -3,6 +3,7 @@ package com.littlemine.webbrowser.client
 import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.ClientBridge
 import com.littlemine.webbrowser.client.audio.MCEFAudioEngine
+import com.littlemine.webbrowser.config.MonitorConfig
 import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.gui.BrowserScreen
 import com.littlemine.webbrowser.client.input.InputHandler
@@ -116,6 +117,20 @@ object ClientGameEvents {
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent.Pre) {
         MCEFAudioEngine.tick()
+        MonitorBlockEntityRenderer.resetRenderCount()
+
+        val mc = Minecraft.getInstance()
+        if (mc.level == null || mc.player == null) return
+        if (mc.level!!.gameTime % 20 != 0L) return
+
+        val playerPos = mc.player!!.blockPosition()
+        val distSq = (12 * 16).toDouble().let { it * it }
+        for (pos in ClientBrowserCache.getAllPositions()) {
+            if (pos.distSqr(playerPos) > distSq) {
+                LOGGER.info("[Monitor] browser {} too far from player, removing", pos)
+                ClientBrowserCache.remove(pos)
+            }
+        }
     }
 
     @SubscribeEvent
