@@ -41,6 +41,12 @@ object Network {
             MonitorAudioPacket.STREAM_CODEC,
             MonitorAudioHandler
         )
+
+        registrar.playToServer(
+            MonitorBrightnessPacket.TYPE,
+            MonitorBrightnessPacket.STREAM_CODEC,
+            MonitorBrightnessHandler
+        )
     }
 }
 
@@ -51,7 +57,20 @@ object MonitorAudioHandler : IPayloadHandler<MonitorAudioPacket> {
         val be = level.getBlockEntity(pos)
         if (be is MonitorBlockEntity) {
             be.audioMode = packet.audioMode.coerceIn(0, 1)
-            be.volume = packet.volume.coerceIn(0, 100)
+            be.volume = packet.volume.coerceIn(0, 300)
+            be.setChanged()
+            level.sendBlockUpdated(pos, be.blockState, be.blockState, 3)
+        }
+    }
+}
+
+object MonitorBrightnessHandler : IPayloadHandler<MonitorBrightnessPacket> {
+    override fun handle(packet: MonitorBrightnessPacket, ctx: IPayloadContext) {
+        val pos = BlockPos(packet.posX, packet.posY, packet.posZ)
+        val level = ctx.player().level()
+        val be = level.getBlockEntity(pos)
+        if (be is MonitorBlockEntity) {
+            be.brightness = packet.brightness.coerceIn(0, 100)
             be.setChanged()
             level.sendBlockUpdated(pos, be.blockState, be.blockState, 3)
         }

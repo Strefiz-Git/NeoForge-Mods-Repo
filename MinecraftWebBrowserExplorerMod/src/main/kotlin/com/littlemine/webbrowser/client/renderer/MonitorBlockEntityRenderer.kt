@@ -177,10 +177,10 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val n = Vector3f(normal)
         pose.normal().transform(n)
 
-        drawVertex(builder, matrix, vertices[0], finalUMin, finalVMax, n)
-        drawVertex(builder, matrix, vertices[1], finalUMax, finalVMax, n)
-        drawVertex(builder, matrix, vertices[2], finalUMax, finalVMin, n)
-        drawVertex(builder, matrix, vertices[3], finalUMin, finalVMin, n)
+        drawVertex(builder, matrix, vertices[0], finalUMin, finalVMax, n, entity)
+        drawVertex(builder, matrix, vertices[1], finalUMax, finalVMax, n, entity)
+        drawVertex(builder, matrix, vertices[2], finalUMax, finalVMin, n, entity)
+        drawVertex(builder, matrix, vertices[3], finalUMin, finalVMin, n, entity)
 
         BufferUploader.drawWithShader(builder.buildOrThrow())
 
@@ -189,11 +189,14 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
 
     private fun drawVertex(
         builder: BufferBuilder, matrix: Matrix4f,
-        localVertex: Vector4f, u: Float, v: Float, normal: Vector3f
+        localVertex: Vector4f, u: Float, v: Float, normal: Vector3f,
+        entity: MonitorBlockEntity? = null
     ) {
         val worldPos = Vector4f(localVertex).mul(matrix)
+        val b = ((entity?.master()?.brightness ?: 100).coerceIn(1, 100) * 255 / 100).coerceIn(0, 255)
+        val color = (0xFF shl 24) or (b shl 16) or (b shl 8) or b
         builder.addVertex(worldPos.x, worldPos.y, worldPos.z)
-            .setColor(-1)
+            .setColor(color)
             .setUv(u, v)
             .setOverlay(OverlayTexture.NO_OVERLAY)
             .setLight(15728880)

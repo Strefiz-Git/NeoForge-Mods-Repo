@@ -4,7 +4,10 @@ import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.BrowserConstants
 import com.littlemine.webbrowser.client.ClientBrowserCache
 import com.littlemine.webbrowser.client.input.InputHandler
+import com.littlemine.webbrowser.item.MonitorCommandItem
+import com.littlemine.webbrowser.network.CommandSyncPacket
 import com.littlemine.webbrowser.network.MonitorAudioPacket
+import com.littlemine.webbrowser.network.MonitorBrightnessPacket
 import com.littlemine.webbrowser.network.MonitorResolutionPacket
 import com.littlemine.webbrowser.network.MonitorUpdatePacket
 import com.mojang.blaze3d.systems.RenderSystem
@@ -29,6 +32,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     private lateinit var previewWField: EditBox
     private lateinit var previewHField: EditBox
     private lateinit var volumeField: EditBox
+    private lateinit var brightnessField: EditBox
     private var audioMode: Int = monitor.audioMode
     private var browserFocused: Boolean = false
     private var lastBrowserMouseX: Double = 0.0
@@ -125,6 +129,23 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
                 .bounds(rX, 345, rW, 20)
                 .build()
         )
+
+        brightnessField = EditBox(font, rX, 385, rW, 20, Component.literal("Brightness"))
+        brightnessField.value = monitor.brightness.toString()
+        brightnessField.setFilter { s -> s.all { it.isDigit() } || s.isEmpty() }
+        addRenderableWidget(brightnessField)
+
+        addRenderableWidget(
+            Button.Builder(Component.literal("Apply Brightness"), { onApplyBrightness() })
+                .bounds(rX, 410, rW, 20)
+                .build()
+        )
+
+        addRenderableWidget(
+            Button.Builder(Component.literal("Disconnect Command"), { onDisconnectCommand() })
+                .bounds(rX, 440, rW, 20)
+                .build()
+        )
     }
 
     private fun onGo() {
@@ -161,10 +182,14 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     private fun onApplyPreviewSize() {
         val w = previewWField.value.toIntOrNull() ?: return
         val h = previewHField.value.toIntOrNull() ?: return
-        if (w > 0 && h > 0) {
-            previewW = w
-            previewH = h
-        }
+        val maxW = ((width * 0.7).toInt() - margin * 2).coerceAtLeast(50)
+        val maxH = (height - margin * 2).coerceAtLeast(50)
+        val clampedW = w.coerceIn(50, maxW)
+        val clampedH = h.coerceIn(50, maxH)
+        previewWField.value = clampedW.toString()
+        previewHField.value = clampedH.toString()
+        previewW = clampedW
+        previewH = clampedH
     }
 
     private fun onCycleAudio() {
@@ -174,13 +199,38 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     private fun onApplyAudio() {
         val vol = volumeField.value.toIntOrNull() ?: return
-        val clampedVol = vol.coerceIn(0, 100)
+        val clampedVol = vol.coerceIn(0, 300)
         volumeField.value = clampedVol.toString()
         monitor.audioMode = audioMode
         monitor.volume = clampedVol
         PacketDistributor.sendToServer(MonitorAudioPacket(
             monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z, audioMode, clampedVol
         ))
+    }
+
+    private fun onApplyBrightness() {
+        val bri = brightnessField.value.toIntOrNull() ?: return
+        val clampedBri = bri.coerceIn(0, 100)
+        brightnessField.value = clampedBri.toString()
+        monitor.brightness = clampedBri
+        PacketDistributor.sendToServer(MonitorBrightnessPacket(
+            monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z, clampedBri
+        ))
+    }
+
+    private fun onDisconnectCommand() {
+        val player = net.minecraft.client.Minecraft.getInstance().player ?: return
+        val stack = player.mainHandItem
+        if (stack.item !is MonitorCommandItem) return
+        if (!MonitorCommandItem.isConnected(stack)) return
+        MonitorCommandItem.disconnect(stack)
+        PacketDistributor.sendToServer(CommandSyncPacket(
+            monitor.blockPos.x, monitor.blockPos.y, monitor.blockPos.z, false
+        ))
+        player.displayClientMessage(
+            net.minecraft.network.chat.Component.translatable("message.webbrowser.disconnected"),
+            true
+        )
     }
 
     override fun render(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
@@ -193,7 +243,8 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         guiGraphics.drawString(font, Component.literal("Pixels/Block:"), rX, 98, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Preview W:"), rX, 168, 0xFFFFFF)
         guiGraphics.drawString(font, Component.literal("Preview H:"), rX, 208, 0xFFFFFF)
-        guiGraphics.drawString(font, Component.literal("Volume (0-100):"), rX, 308, 0xFFFFFF)
+        guiGraphics.drawString(font, Component.literal("Volume (0-300):"), rX, 308, 0xFFFFFF)
+        guiGraphics.drawString(font, Component.literal("Brightness (0-100):"), rX, 373, 0xFFFFFF)
 
         if (browserFocused) {
             guiGraphics.drawString(font, Component.literal("Browser mode - Press Tab for URL"), 10, height - 20, 0x888888)
@@ -262,8 +313,11 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         if (bw <= 0 || bh <= 0) return null
 
         val aspect = bw.toFloat() / bh.toFloat()
-        val pW = previewDrawW.toFloat()
-        val pH = previewDrawH.toFloat()
+        // Clamp container to available area on the left
+        val maxW = ((width * 0.7).toInt() - margin * 2).coerceAtLeast(50)
+        val maxH = (height - margin * 2).coerceAtLeast(50)
+        val pW = previewDrawW.coerceAtMost(maxW).toFloat()
+        val pH = previewDrawH.coerceAtMost(maxH).toFloat()
         val pAspect = pW / pH
 
         val drawW: Float
@@ -308,22 +362,24 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
         val matrix = guiGraphics.pose().last().pose()
 
+        RenderSystem.disableDepthTest()
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
-        RenderSystem.bindTexture(texId)
+        val bri = monitor.brightness.coerceIn(1, 100) / 100f
+        RenderSystem.setShaderColor(bri, bri, bri, 1f)
+        RenderSystem.setShaderTexture(0, texId)
         RenderSystem.setShader(GameRenderer::getPositionTexShader)
 
         val bb = ByteBufferBuilder(256)
         val builder = BufferBuilder(bb, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
 
-        // CEF mirror → flip U; GUI Y increases downward → V as-is (0=top in UV)
-        builder.addVertex(matrix, drawX, drawY, 0f).setUv(1f, 0f)
-        builder.addVertex(matrix, drawX, drawY + drawH, 0f).setUv(1f, 1f)
-        builder.addVertex(matrix, drawX + drawW, drawY + drawH, 0f).setUv(0f, 1f)
-        builder.addVertex(matrix, drawX + drawW, drawY, 0f).setUv(0f, 0f)
+        builder.addVertex(matrix, drawX, drawY, 0f).setUv(0f, 0f)
+        builder.addVertex(matrix, drawX, drawY + drawH, 0f).setUv(0f, 1f)
+        builder.addVertex(matrix, drawX + drawW, drawY + drawH, 0f).setUv(1f, 1f)
+        builder.addVertex(matrix, drawX + drawW, drawY, 0f).setUv(1f, 0f)
 
         BufferUploader.drawWithShader(builder.buildOrThrow())
+        RenderSystem.enableDepthTest()
     }
 
     private fun isInPreviewArea(mx: Double, my: Double): Boolean {
@@ -425,11 +481,13 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         }
 
         if (keyCode == 258) {
-            if (urlField.isFocused || pixelsField.isFocused || previewWField.isFocused || previewHField.isFocused) {
+            if (urlField.isFocused || pixelsField.isFocused || previewWField.isFocused || previewHField.isFocused || volumeField.isFocused || brightnessField.isFocused) {
                 urlField.isFocused = false
                 pixelsField.isFocused = false
                 previewWField.isFocused = false
                 previewHField.isFocused = false
+                volumeField.isFocused = false
+                brightnessField.isFocused = false
                 browserFocused = true
                 return true
             }

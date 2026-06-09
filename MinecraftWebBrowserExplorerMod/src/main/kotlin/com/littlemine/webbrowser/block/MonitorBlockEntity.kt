@@ -22,6 +22,7 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
     var pixelsPerBlock: Int = 120
     var audioMode: Int = 0 // 0=player, 1=center_block
     var volume: Int = 100 // 0-100
+    var brightness: Int = 100 // 0-100 (screen brightness)
     var isActive: Boolean = false
     var masterPos: BlockPos = blockPos
     var shape: MonitorShape? = null
@@ -128,6 +129,8 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                     be.width = detected.width
                     be.height = detected.height
                     be.pixelsPerBlock = pixelsPerBlock
+                    be.volume = volume
+                    be.brightness = brightness
                     be.isActive = true
                     be.masterPos = detected.topLeft
                     be.shape = detected
@@ -159,11 +162,13 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         tag.putInt("pixelsPerBlock", pixelsPerBlock)
         tag.putInt("audioMode", audioMode)
         tag.putInt("volume", volume)
+        tag.putInt("brightness", brightness)
         tag.putBoolean("active", isActive)
         tag.putLong("master_pos", masterPos.asLong())
     }
 
     override fun loadAdditional(tag: CompoundTag, registries: HolderLookup.Provider) {
+        val wasActive = isActive
         super.loadAdditional(tag, registries)
         width = tag.getInt("width")
         height = tag.getInt("height")
@@ -171,9 +176,18 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         if (tag.contains("pixelsPerBlock")) pixelsPerBlock = tag.getInt("pixelsPerBlock")
         if (tag.contains("audioMode")) audioMode = tag.getInt("audioMode")
         if (tag.contains("volume")) volume = tag.getInt("volume")
+        if (tag.contains("brightness")) brightness = tag.getInt("brightness")
         isActive = tag.getBoolean("active")
         if (tag.contains("master_pos")) masterPos = BlockPos.of(tag.getLong("master_pos"))
-        recalculateClientShape()
+        if (level?.isClientSide == true && wasActive && !isActive) {
+            val master = if (isMaster) this else level?.getBlockEntity(masterPos)
+            if (master is MonitorBlockEntity) {
+                ClientBridge.onMonitorBreak?.invoke(master)
+            } else {
+                ClientBridge.onMonitorBreak?.invoke(this)
+            }
+        }
+        if (isActive) recalculateClientShape()
     }
 
     fun recalculateClientShape() {

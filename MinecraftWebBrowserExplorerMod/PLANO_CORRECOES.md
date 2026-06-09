@@ -58,18 +58,65 @@
 - **Ficheiro:** `ClientSetup.kt:71-83` (agora corrigido), `BrowserScreen.kt:60-70` (agora corrigido)
 - **Estado:** CORRIGIDO
 
+### 8. Browser não é limpo quando monitor é partido (cliente não recebe notificação)
+- `invalidateMonitor()` só chama `ClientBridge.onMonitorBreak` quando `wasClient == true`
+- No servidor, `wasClient = false`, browser nunca é fechado
+- Cliente recebe sync do NBT via `loadAdditional()` mas não notifica o bridge
+- **Impacto:** Browser leak ao partir blocos do monitor
+- **Ficheiro:** `MonitorBlockEntity.kt:176-184` (agora corrigido)
+- **Estado:** CORRIGIDO
+
+### 9. Preview não renderiza no GUI — textura CEF visível como cinzento
+- `RenderSystem.bindTexture(texId)` não liga corretamente a textura ao shader no GUI
+- Depth test ativo impede desenho correto no espaço 2D
+- `RenderSystem.setShaderTexture(0, texId)` + `RenderSystem.disableDepthTest()` corrigem
+- **Ficheiro:** `BrowserScreen.kt:307-317` (agora corrigido)
+- **Estado:** CORRIGIDO
+
+### 10. Preview não cabe na área disponível quando tamanho é alterado
+- Campos de preview permitiam valores maiores que a área disponível (70% largura, full altura)
+- `getScaledPreviewArea()` não clampava o container, causando overflow
+- `onApplyPreviewSize()` não validava input
+- **Ficheiro:** `BrowserScreen.kt:259-281`, `BrowserScreen.kt:149-156` (agora corrigido)
+- **Estado:** CORRIGIDO
+
+### 11. Comando não fica connectado no cliente após shift+left-click
+- `CommandSyncHandler` modifica server-side stack, mas cliente não vê mudança imediata
+- Sync do inventário pode demorar ticks → right-click falha porque `isConnected()` retorna false
+- **Ficheiro:** `GameEvents.kt:29-33` — `MonitorCommandItem.connectTo()` chamado no cliente antes de enviar packet
+- **Estado:** CORRIGIDO
+
+### 12. Preview espelhada horizontalmente no BrowserScreen
+- Preview no GUI usava U invertido (1→0) com comentário "CEF mirror — flip U"
+- **Apenas a preview do GUI estava espelhada** — o render in-world `MonitorBlockEntityRenderer` estava correto (mantém o flip U, a textura CEF é mesmo espelhada)
+- A preview precisa de UV normal (U 0→1) porque o vertex order + shader `POSITION_TEX` difere do `NEW_ENTITY` do renderer de blocos
+- **Ficheiro:** `BrowserScreen.kt:309-312` (agora corrigido)
+- **Estado:** CORRIGIDO
+
+---
+
+## Limitações Conhecidas
+
+### A. DRM (Widevine) não suportado — filmes/séries não funcionam
+- O MCEF não inclui os módulos CDM (Content Decryption Module) do Widevine/Google
+- **Disney+, HBO Max, Amazon Prime Video, Netflix** — todos bloqueiam reprodução por DRM
+- Mesmo com sessão iniciada, o ecrã fica preto ou mostra erro de "navegador não compatível"
+- **Causa:** Ausência de licenciamento Widevine na build do CEF; o MCEF até pode ter suporte experimental, mas os binários Widevine não são distribuídos
+- **Impacto:** Permanente — sem solução simples
+- **Workaround:** Nenhum; o monitor serve para sites sem DRM (YouTube, Twitch, redes sociais, documentação)
+
 ---
 
 ## Bugs Médios
 
-### 8. `tryFormMonitor()` chamado em ambos os lados — cliente modifica mundo
+### 13. `tryFormMonitor()` chamado em ambos os lados — cliente modifica mundo
 - `onPlace` corre em client e server
 - Ambos chamam `tryFormMonitor()` que faz `level.setBlock()`
 - Cliente modifica block states localmente antes do servidor enviar autoritativamente
 - **Impacto:** Janela de desync visuais em multiplayer
 - **Ficheiro:** `MonitorBlock.kt:76`, `MonitorBlockEntity.kt:93-151`
 
-### 9. `renderTypeCache` nunca é limpa ao redimensionar browser
+### 14. `renderTypeCache` nunca é limpa ao redimensionar browser
 - `ClientBrowserCache.recreate()` fecha browser velho e cria novo (potencialmente texture ID diferente)
 - `clearRenderTypeCache()` não é chamada durante resize
 - Entradas antigas (keyed por texture ID velho) acumulam-se no mapa
@@ -77,7 +124,7 @@
 - **Impacto:** Pequeno leak de memória por cada mudança de resolução
 - **Ficheiro:** `MonitorBlockEntityRenderer.kt:27-37`
 
-### 10. `onCycleAudio()` destrói estado dos widgets via `rebuildWidgets()`
+### 15. `onCycleAudio()` destrói estado dos widgets via `rebuildWidgets()`
 - `rebuildWidgets()` → `clearWidget()` + `init()` reconstrói TUDO
 - Qualquer texto não aplicado nos campos é perdido
 - Foco do teclado é resetado
