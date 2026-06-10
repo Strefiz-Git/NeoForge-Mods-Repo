@@ -239,16 +239,27 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         } else {
             shape = null
         }
+        if (isActive && shape == null) recalculateClientShape()
         if (level?.isClientSide == true) {
             if (wasActive && !isActive) {
                 val master = if (isMaster) this else level?.getBlockEntity(masterPos) as? MonitorBlockEntity
                 if (master != null) ClientBridge.onMonitorBreak?.invoke(master)
             } else if (!wasActive && isActive) {
                 val master = if (isMaster) this else level?.getBlockEntity(masterPos) as? MonitorBlockEntity
-                if (master != null) ClientBridge.onMonitorFormed?.invoke(master)
+                if (master != null && master.shape != null) {
+                    ClientBridge.onMonitorFormed?.invoke(master)
+                }
             }
         }
-        if (isActive && shape == null) recalculateClientShape()
+        // After recalculation, if master now has a shape but no browser yet (onMonitorFormed
+        // ran before recalculation found the shape), create the browser now.
+        if (level?.isClientSide == true && isActive) {
+            val master = if (isMaster) this else level?.getBlockEntity(masterPos) as? MonitorBlockEntity
+            if (master != null && master.shape != null
+                && com.littlemine.webbrowser.client.ClientBrowserCache.get(master.blockPos) == null) {
+                ClientBridge.onMonitorFormed?.invoke(master)
+            }
+        }
     }
 
     fun recalculateClientShape() {
