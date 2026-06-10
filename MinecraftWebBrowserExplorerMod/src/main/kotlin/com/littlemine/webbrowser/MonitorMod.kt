@@ -18,6 +18,19 @@ class MonitorMod(modBus: IEventBus, container: ModContainer) {
 
     companion object {
         const val MOD_ID = "webbrowser"
+
+        private val CLEANUP_LOGGER: org.slf4j.Logger = com.mojang.logging.LogUtils.getLogger()
+
+        private fun killOrphanedJcefHelpers() {
+            try {
+                val pb = ProcessBuilder("taskkill", "/f", "/im", "jcef_helper.exe")
+                pb.redirectErrorStream(true)
+                val p = pb.start()
+                if (!p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                    p.destroyForcibly()
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     init {
@@ -30,6 +43,12 @@ class MonitorMod(modBus: IEventBus, container: ModContainer) {
             container.registerExtensionPoint(IConfigScreenFactory::class.java, IConfigScreenFactory { _, parent ->
                 ConfigurationScreen(container, parent)
             })
+
+            killOrphanedJcefHelpers()
+
+            Runtime.getRuntime().addShutdownHook(Thread({
+                killOrphanedJcefHelpers()
+            }, "WB-Cleanup"))
         }
 
         BlockRegistry.BLOCKS.register(modBus)
