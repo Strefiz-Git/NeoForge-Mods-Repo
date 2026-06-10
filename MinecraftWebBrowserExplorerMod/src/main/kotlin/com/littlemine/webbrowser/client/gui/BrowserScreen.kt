@@ -39,6 +39,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
     private var lastScreenMouseX: Double = 0.0
     private var lastScreenMouseY: Double = 0.0
     private var fullscreen: Boolean = false
+    private var ticksSinceOpen = 0
 
     private val margin: Int = 10
 
@@ -65,6 +66,11 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
             } else {
                 LOGGER.warn("[BrowserScreen] no browser in cache and shape is null - cannot create browser yet")
             }
+        }
+
+        ClientBrowserCache.get(monitor.blockPos)?.let { b ->
+            b.setFocus(false)
+            b.sendMouseMove(0, 0)
         }
 
         urlField = EditBox(font, rX, 40, rW, 20, Component.literal("URL"))
@@ -444,7 +450,12 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         return Pair(relX * bw, relY * bh)
     }
 
+    override fun tick() {
+        if (ticksSinceOpen < 10) ticksSinceOpen++
+    }
+
     override fun mouseClicked(mx: Double, my: Double, button: Int): Boolean {
+        if (ticksSinceOpen < 3) return super.mouseClicked(mx, my, button)
         if (isInPreviewArea(mx, my)) {
             browserFocused = true
             urlField.isFocused = false
@@ -586,6 +597,10 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
 
     override fun onClose() {
         InputHandler.setActiveMonitor(null)
+        ClientBrowserCache.get(monitor.blockPos)?.let { b ->
+            b.setFocus(false)
+            b.sendMouseMove(0, 0)
+        }
         super.onClose()
     }
 

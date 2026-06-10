@@ -222,19 +222,11 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         }
         if (level?.isClientSide == true) {
             if (wasActive && !isActive) {
-                val master = if (isMaster) this else level?.getBlockEntity(masterPos)
-                if (master is MonitorBlockEntity) {
-                    ClientBridge.onMonitorBreak?.invoke(master)
-                } else {
-                    ClientBridge.onMonitorBreak?.invoke(this)
-                }
+                val master = if (isMaster) this else level?.getBlockEntity(masterPos) as? MonitorBlockEntity
+                if (master != null) ClientBridge.onMonitorBreak?.invoke(master)
             } else if (!wasActive && isActive) {
-                val master = if (isMaster) this else level?.getBlockEntity(masterPos)
-                if (master is MonitorBlockEntity) {
-                    ClientBridge.onMonitorFormed?.invoke(master)
-                } else {
-                    ClientBridge.onMonitorFormed?.invoke(this)
-                }
+                val master = if (isMaster) this else level?.getBlockEntity(masterPos) as? MonitorBlockEntity
+                if (master != null) ClientBridge.onMonitorFormed?.invoke(master)
             }
         }
         if (isActive && shape == null) recalculateClientShape()

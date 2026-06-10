@@ -58,8 +58,8 @@ object ClientBrowserCache {
     fun clear() {
         val keys = browsers.keys.toList()
         LOGGER.info("[BrowserCache] clear ({} browsers)", browsers.size)
+        for (pos in keys) MCEFAudioEngine.unregister(pos)
         browsers.values.forEach { it.close() }
         browsers.clear()
-        for (pos in keys) MCEFAudioEngine.unregister(pos)
     }
 }

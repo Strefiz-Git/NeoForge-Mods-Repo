@@ -49,6 +49,8 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
 
     override fun getViewDistance(): Int = BrowserConstants.VIEW_DISTANCE_BLOCKS
 
+    private var lastLogTick = 0L
+
     override fun render(
         entity: MonitorBlockEntity,
         partialTick: Float,
@@ -57,41 +59,49 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         packedLight: Int,
         packedOverlay: Int
     ) {
+        val currentTick = Minecraft.getInstance().level?.gameTime ?: 0L
+        val shouldLog = currentTick - lastLogTick >= 40
+        val pos = entity.blockPos
+
         if (!entity.isActive) {
-            LOGGER.trace("[Renderer] skip inactive at {}", entity.blockPos)
+            if (shouldLog) { LOGGER.info("[Renderer] skip inactive at {}", pos); lastLogTick = currentTick }
             return
         }
         val master = entity.master()
-        val browser = ClientBrowserCache.get(master.blockPos)
+        val masterPos = master.blockPos
+        if (masterPos != pos && shouldLog) {
+            LOGGER.info("[Renderer] {} master={} isMaster={}", pos, masterPos, entity.isMaster)
+        }
+        val browser = ClientBrowserCache.get(masterPos)
         if (browser == null) {
-            LOGGER.trace("[Renderer] no browser for master {} at {}", master.blockPos, entity.blockPos)
+            if (shouldLog) { LOGGER.info("[Renderer] no browser for master {} at {}", masterPos, pos); lastLogTick = currentTick }
             return
         }
 
         // Config: render toggle
-        if (MonitorConfig.renderScreens?.get() != true) {
-            LOGGER.trace("[Renderer] renderScreens disabled, skip {}", entity.blockPos)
+        if (MonitorConfig.renderScreens?.get() == false) {
+            if (shouldLog) { LOGGER.info("[Renderer] renderScreens disabled, skip {}", pos); lastLogTick = currentTick }
             return
         }
 
         // Frustum culling: skip if block is behind camera (normalized dot product)
         val camera = Minecraft.getInstance().gameRenderer.mainCamera
-        val blockCenter = Vec3.atCenterOf(entity.blockPos)
+        val blockCenter = Vec3.atCenterOf(pos)
         val toBlock = blockCenter.subtract(camera.position).normalize()
         val lookVec = camera.getLookVector()
-        val dot = lookVec.dot(toBlock)
+        val dot = lookVec.x() * toBlock.x() + lookVec.y() * toBlock.y() + lookVec.z() * toBlock.z()
         if (dot < 0.0) {
-            LOGGER.trace("[Renderer] behind camera (dot={}), skip {}", dot, entity.blockPos)
+            if (shouldLog) { LOGGER.info("[Renderer] behind camera (dot={}), skip {}", String.format("%.2f", dot), pos); lastLogTick = currentTick }
             return
         }
 
         // Render limit: count unique monitors (masters), not individual blocks
         val limit = MonitorConfig.maxMonitorsRendered?.get() ?: 0
-        if (limit > 0 && master.blockPos !in renderedMasters && renderedMasters.size >= limit) {
-            LOGGER.trace("[Renderer] render limit hit ({}), skip {}", limit, entity.blockPos)
+        if (limit > 0 && masterPos !in renderedMasters && renderedMasters.size >= limit) {
+            if (shouldLog) { LOGGER.info("[Renderer] render limit hit ({}), skip {}", limit, pos); lastLogTick = currentTick }
             return
         }
-        renderedMasters.add(master.blockPos)
+        renderedMasters.add(masterPos)
 
         val state = entity.blockState
         val facing = state.getValue(MonitorBlock.FACING)
@@ -124,13 +134,16 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         val vMax = (row + 1).toFloat() / shape.height
 
         val textureId = browser.renderer.textureID
-        LOGGER.trace("[Renderer] {} col={} row={} uv=[{},{},{},{}] texId={}",
-            entity.blockPos, col, row, uMin, uMax, vMin, vMax, textureId)
+        if (shouldLog) {
+            LOGGER.info("[Renderer] RENDERING {} col={} row={} uv=[{},{},{},{}] texId={}",
+                pos, col, row, uMin, uMax, vMin, vMax, textureId)
+            lastLogTick = currentTick
+        }
 
         val renderType = getOrCreateRenderType(textureId)
         renderType.setupRenderState()
-
         val byteBuffer = ByteBufferBuilder(256)
+        try {
         val builder = BufferBuilder(byteBuffer, VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY)
 
         val vertices: Array<Vector4f>
@@ -217,8 +230,7 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         drawVertex(builder, matrix, vertices[3], finalUMin, finalVMin, n, entity)
 
         BufferUploader.drawWithShader(builder.buildOrThrow())
-
-        renderType.clearRenderState()
+        } finally { renderType.clearRenderState() }
     }
 
     private fun drawVertex(
@@ -227,7 +239,7 @@ class MonitorBlockEntityRenderer(ctx: BlockEntityRendererProvider.Context) : Blo
         entity: MonitorBlockEntity? = null
     ) {
         val worldPos = Vector4f(localVertex).mul(matrix)
-        val b = ((entity?.master()?.brightness ?: 100).coerceIn(1, 500) * 255 / 500).coerceIn(0, 255)
+        val b = ((entity?.master()?.brightness ?: 100).coerceIn(0, 500) * 255 / 100).coerceIn(0, 255)
         val color = (0xFF shl 24) or (b shl 16) or (b shl 8) or b
         builder.addVertex(worldPos.x, worldPos.y, worldPos.z)
             .setColor(color)

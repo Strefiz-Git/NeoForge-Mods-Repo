@@ -9,6 +9,9 @@ import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.ModContainer
 import net.neoforged.fml.common.Mod
 import net.neoforged.fml.config.ModConfig
+import net.neoforged.fml.loading.FMLEnvironment
+import net.neoforged.neoforge.client.gui.ConfigurationScreen
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory
 
 @Mod(MonitorMod.MOD_ID)
 class MonitorMod(modBus: IEventBus, container: ModContainer) {
@@ -22,6 +25,12 @@ class MonitorMod(modBus: IEventBus, container: ModContainer) {
         MonitorConfig.registerCommonConfigs()
         container.registerConfig(ModConfig.Type.CLIENT, MonitorConfig.CLIENT_SPEC, "webbrowser-client.toml")
         container.registerConfig(ModConfig.Type.COMMON, MonitorConfig.COMMON_SPEC, "webbrowser-common.toml")
+
+        if (FMLEnvironment.dist.isClient) {
+            container.registerExtensionPoint(IConfigScreenFactory::class.java, IConfigScreenFactory { _, parent ->
+                ConfigurationScreen(container, parent)
+            })
+        }
 
         BlockRegistry.BLOCKS.register(modBus)
         ItemRegistry.ITEMS.register(modBus)
