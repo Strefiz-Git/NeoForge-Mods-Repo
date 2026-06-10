@@ -2,7 +2,6 @@ package com.littlemine.webbrowser.client
 
 import com.cinemamod.mcef.MCEF
 import com.littlemine.webbrowser.ClientBridge
-import com.littlemine.webbrowser.client.audio.MCEFAudioEngine
 import com.littlemine.webbrowser.config.MonitorConfig
 import com.littlemine.webbrowser.block.MonitorBlockEntity
 import com.littlemine.webbrowser.client.gui.BrowserScreen
@@ -116,7 +115,6 @@ object ClientGameEvents {
 
     @SubscribeEvent
     fun onClientTick(event: ClientTickEvent.Pre) {
-        MCEFAudioEngine.tick()
         MonitorBlockEntityRenderer.resetRenderCount()
 
         val mc = Minecraft.getInstance()

@@ -136,6 +136,18 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
         isActive = true
         masterPos = detected.topLeft
 
+        // If this is not the master and has default settings, get settings from master
+        if (masterPos != blockPos) {
+            val topBe = level.getBlockEntity(masterPos)
+            if (topBe is MonitorBlockEntity && topBe.isActive) {
+                if (pixelsPerBlock == 120 || pixelsPerBlock == 0) pixelsPerBlock = topBe.pixelsPerBlock
+                if (audioMode == 0) audioMode = topBe.audioMode
+                if (volume == 100 || volume == 0) volume = topBe.volume
+                if (brightness == 100) brightness = topBe.brightness
+                if (currentUrl == "https://www.google.com") currentUrl = topBe.currentUrl
+            }
+        }
+
         for (row in 0 until detected.height) {
             for (col in 0 until detected.width) {
                 val p = detected.topLeft.offset(
@@ -149,12 +161,19 @@ class MonitorBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(BlockEn
                 level.setBlock(p, state.setValue(MonitorBlock.PART, part).setValue(MonitorBlock.ACTIVE, true), 3)
                 val be = level.getBlockEntity(p)
                 if (be is MonitorBlockEntity && be !== this) {
+                    val isNewBlock = !be.isActive || be.pixelsPerBlock == 120
                     be.width = detected.width
                     be.height = detected.height
-                    be.pixelsPerBlock = pixelsPerBlock
-                    be.audioMode = audioMode
-                    be.volume = volume
-                    be.brightness = brightness
+                    if (isNewBlock) {
+                        be.pixelsPerBlock = pixelsPerBlock
+                        be.audioMode = audioMode
+                        be.volume = volume
+                        be.brightness = brightness
+                        be.currentUrl = currentUrl
+                    } else {
+                        LOGGER.info("[BE] tryFormMonitor preserving settings for {} (ppb={} bri={} url={})",
+                            p, be.pixelsPerBlock, be.brightness, be.currentUrl)
+                    }
                     be.isActive = true
                     be.masterPos = detected.topLeft
                     be.shape = detected

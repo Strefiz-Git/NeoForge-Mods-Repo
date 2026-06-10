@@ -376,7 +376,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         RenderSystem.disableDepthTest()
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
-        val bri = monitor.brightness.coerceIn(1, BrowserConstants.MAX_BRIGHTNESS) / 100f
+        val bri = BrowserConstants.brightnessToFloat(monitor.brightness)
         RenderSystem.setShaderColor(bri, bri, bri, 1f)
         RenderSystem.setShaderTexture(0, texId)
         RenderSystem.setShader(GameRenderer::getPositionTexShader)
@@ -410,7 +410,7 @@ class BrowserScreen(private val monitor: MonitorBlockEntity) : Screen(Component.
         RenderSystem.disableDepthTest()
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
-        val bri = monitor.brightness.coerceIn(1, BrowserConstants.MAX_BRIGHTNESS) / 100f
+        val bri = BrowserConstants.brightnessToFloat(monitor.brightness)
         RenderSystem.setShaderColor(bri, bri, bri, 1f)
         RenderSystem.setShaderTexture(0, texId)
         RenderSystem.setShader(GameRenderer::getPositionTexShader)

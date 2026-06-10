@@ -87,13 +87,15 @@ object MonitorBrightnessHandler : IPayloadHandler<MonitorBrightnessPacket> {
 }
 
 object MonitorResolutionHandler : IPayloadHandler<MonitorResolutionPacket> {
+    private val serverMaxPixels = 512 // matches client config max
+
     override fun handle(packet: MonitorResolutionPacket, ctx: IPayloadContext) {
         val pos = BlockPos(packet.posX, packet.posY, packet.posZ)
         if (!checkDistance(pos, ctx)) return
         val level = ctx.player().level()
         val be = level.getBlockEntity(pos)
         if (be is MonitorBlockEntity) {
-            val ppb = packet.pixelsPerBlock.coerceIn(BrowserConstants.MIN_BLOCK_PIXELS, BrowserConstants.MAX_BLOCK_PIXELS)
+            val ppb = packet.pixelsPerBlock.coerceIn(BrowserConstants.MIN_BLOCK_PIXELS, serverMaxPixels)
             be.pixelsPerBlock = ppb
             be.setChanged()
             level.sendBlockUpdated(pos, be.blockState, be.blockState, 3)
